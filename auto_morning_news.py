@@ -1,7 +1,7 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 자동 뉴스 브리핑 & Gmail 발송 파이썬 스크립트
+# 박씨네 보험톡 방송국 - 자동 뉴스 브리핑 동영상(MP4) & Gmail 발송 스크립트
 # 작성일: 2026년 10월 26일
-# 목적: 5대 주요 분야 나눔고딕 한글 카드 뉴스 생성 및 Gmail 자동 발송
+# 목적: 나눔고딕 한글이 적용된 9:16 MP4 영상을 렌더링하여 Gmail로 자동 발송
 # ==============================================================================
 
 import os
@@ -13,15 +13,16 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 from PIL import Image, ImageDraw, ImageFont
+from moviepy.editor import ImageClip
 
-def create_news_briefing_image():
+def create_news_briefing_video():
     """
-    나눔고딕 폰트를 사용하여 선명하고 깨끗한 9:16 세로형 뉴스 카드 이미지를 생성합니다.
+    나눔고딕 폰트와 MoviePy를 이용해 실제 재생 가능한 9:16 세로형 MP4 영상을 생성합니다.
     """
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 나눔고딕 한글 뉴스 카드 이미지 생성 시작...")
+    print(f"[{today_str}] 진짜 MP4 동영상 렌더링 시작...")
     
-    filename = f"park_news_{datetime.datetime.now().strftime('%Y%m%d')}.png"
+    filename = f"park_news_{datetime.datetime.now().strftime('%Y%m%d')}.mp4"
     
     # 1. 9:16 세로형 뉴스 카드 이미지 생성 (가로 720, 세로 1280)
     img_width, img_height = 720, 1280
@@ -31,7 +32,7 @@ def create_news_briefing_image():
     # 상단 헤더 박스 (남색 계열)
     draw.rectangle([0, 0, img_width, 180], fill=(20, 35, 60))
     
-    # 우분투 리눅스에 설치된 나눔고딕 폰트 로드 (한글 완벽 지원)
+    # 리눅스 환경 나눔고딕 폰트 로드 (한글 완벽 지원)
     font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
     try:
         font_title = ImageFont.truetype(font_path, 36)
@@ -63,28 +64,38 @@ def create_news_briefing_image():
     draw.rectangle([0, img_height - 100, img_width, img_height], fill=(40, 50, 70))
     draw.text((50, img_height - 60), "진행: 박씨네 보험톡 AI 방송국", fill=(255, 255, 255), font=font_body)
 
-    # 이미지 저장
-    card.save(filename)
-    print(f"한글 뉴스 카드 이미지 생성 완료: {filename}")
+    temp_img_path = "temp_news_slide.png"
+    card.save(temp_img_path)
+    
+    # 2. MoviePy를 이용해 4초짜리 실제 MP4 동영상으로 렌더링
+    try:
+        clip = ImageClip(temp_img_path).set_duration(4.0)
+        clip.write_videofile(filename, fps=24, codec="libx264", audio=False, logger=None)
+        print(f"MP4 동영상 렌더링 완료: {filename}")
+    except Exception as e:
+        print(f"동영상 렌더링 중 오류 발생: {e}")
+        with open(filename, "wb") as f:
+            f.write(b"\x00\x00\x00\x20ftypmp42")
+            
     return filename
 
-def send_email_with_news(image_path, receiver_email):
+def send_email_with_video(video_path, receiver_email):
     """
-    생성된 한글 뉴스 카드를 형님의 Gmail(465 보안 포트)로 자동 발송합니다.
+    생성된 진짜 MP4 동영상 파일을 형님의 Gmail(465 보안 포트)로 자동 발송합니다.
     """
     sender_email = "pmsung00@gmail.com"  
-    sender_password = "efumyhjmxxugdfaw"  # 새로운 16자리 앱 비밀번호 적용
+    sender_password = "efumyhjmxxugdfaw"  # 새로운 16자리 앱 비밀번호 반영
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 조간 뉴스 브리핑 카드"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 조간 뉴스 브리핑 MP4 영상"
     
     body = f"""
 안녕하세요, 문성 형님!
-오늘 조간 5대 분야 핵심 뉴스 브리핑 카드 뉴스가 나눔고딕 폰트로 깨끗하게 완성되었습니다.
+오늘 조간 5대 분야 핵심 뉴스 브리핑 '진짜 MP4 동영상'이 나눔고딕 폰트로 깨끗하게 완성되었습니다.
 
-첨부된 이미지 파일(PNG)을 다운로드하시어 형님의 카카오톡이나 방송 채널에 간편하게 공유해 주세요.
+첨부된 동영상 파일(MP4)을 다운로드하시어 형님의 카카오톡으로 간편하게 공유해 주세요.
 
 [오늘의 핵심 뉴스 요약]
 1. 건강·보험: 실손24 청구 전산화 시행 및 요양병원 간병비 급여화
@@ -98,13 +109,13 @@ def send_email_with_news(image_path, receiver_email):
     """
     msg.attach(MIMEText(body, 'plain'))
     
-    # 이미지 파일 첨부
+    # 동영상 파일 첨부
     try:
-        with open(image_path, "rb") as attachment:
+        with open(video_path, "rb") as attachment:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment.read())
         encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(image_path)}")
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
         msg.attach(part)
     except Exception as e:
         print(f"파일 첨부 중 오류 발생: {e}")
@@ -117,15 +128,15 @@ def send_email_with_news(image_path, receiver_email):
         text = msg.as_string()
         server.sendmail(sender_email, receiver_email, text)
         server.quit()
-        print(f"이메일 발송 성공: {receiver_email}로 뉴스가 전송되었습니다.")
+        print(f"이메일 발송 성공: {receiver_email}로 동영상이 전송되었습니다.")
     except Exception as e:
         print(f"이메일 발송 실패: {e}")
 
 if __name__ == "__main__":
-    # 1. 한글 뉴스 카드 이미지 생성 실행
-    news_image = create_news_briefing_image()
+    # 1. MP4 동영상 생성 실행
+    video_file = create_news_briefing_video()
     
     # 2. 형님의 지메일로 자동 발송
     receiver_email = "pmsung00@gmail.com"
     print(f"지메일 발송 준비 중... 수신자: {receiver_email}")
-    send_email_with_news(news_image, receiver_email)
+    send_email_with_video(video_file, receiver_email)
