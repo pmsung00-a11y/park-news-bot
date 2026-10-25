@@ -38,7 +38,7 @@ def send_email_with_video(video_path, receiver_email):
     생성된 MP4 영상을 Gmail SMTP를 통해 형님의 이메일로 자동 발송합니다.
     """
     sender_email = "pmsung00@gmail.com"  # 형님의 지메일 주소 입력
-    sender_password = "pnli zehq mwsx sjbo"  # 지메일 앱 비밀번호 (16자리)
+    sender_password = "pnlizehqmwsxsjbo"  # 지메일 앱 비밀번호 (16자리)
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
