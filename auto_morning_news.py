@@ -1,7 +1,7 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 완벽 보완된 7개 멀티 슬라이드 조간 뉴스 동영상 & TTS 자동화
+# 박씨네 보험톡 방송국 - 일일 80초 요약뉴스 최종 완성본 (풍성한 뉴스 본문 + 완벽 싱크)
 # 작성일: 2026년 10월 26일
-# 특징: 표지(프로필 사진), 5대 주요 뉴스 슬라이드, 엔딩 화면 + 자연스러운 gTTS 오디오
+# 특징: 표지(프로필 사진), 5대 주요 분야별 다중 뉴스 텍스트 완벽 수록, 80초 맞춤형 음성
 # ==============================================================================
 
 import os
@@ -18,11 +18,11 @@ from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
 def create_full_news_video_with_audio():
     """
-    표지, 5대 주요 뉴스 슬라이드(각각 고유한 내용), 엔딩 슬라이드에 
-    나눔고딕 디자인과 gTTS 음성을 정확히 입혀 고품질 MP4 영상을 생성합니다.
+    표지(형님 사진), 5대 분야별 풍성한 뉴스 카드, 엔딩 슬라이드에 
+    나눔고딕 디자인과 gTTS 음성을 정확히 입혀 총 80초 분량의 명품 MP4 영상을 생성합니다.
     """
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 박씨네 보험톡 7개 슬라이드 뉴스 영상 렌더링 시작...")
+    print(f"[{today_str}] 박씨네 보험톡 일일 80초 요약뉴스 최종 렌더링 시작...")
     
     filename = f"park_news_{datetime.datetime.now().strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -32,7 +32,7 @@ def create_full_news_video_with_audio():
     try:
         font_large = ImageFont.truetype(font_path, 42)
         font_title = ImageFont.truetype(font_path, 34)
-        font_body = ImageFont.truetype(font_path, 26)
+        font_body = ImageFont.truetype(font_path, 22)  # 다중 뉴스가 들어가도록 폰트 크기 최적화
         font_small = ImageFont.truetype(font_path, 20)
     except:
         font_large = ImageFont.load_default()
@@ -42,57 +42,57 @@ def create_full_news_video_with_audio():
 
     clips = []
     
-    # 표지 + 5대 뉴스 + 엔딩 총 7장의 슬라이드 데이터 정의
+    # 표지(10초) + 5대 뉴스(각 12초 = 60초, 풍성한 뉴스 내용) + 엔딩(10초) = 총 80초 구성
     slides_data = [
         {
             "type": "cover",
-            "script": f"안녕하십니까, 박씨네 보험톡 조간 뉴스 브리핑입니다. 오늘 발행일은 {today_str}이며, 진행에 보험설계사 문성입니다.",
-            "duration": 9.0
+            "script": f"안녕하십니까, 박씨네 보험톡 일일 80초 요약뉴스입니다. 오늘 발행일은 {today_str}이며, 진행에 보험설계사 문성입니다.",
+            "duration": 10.0
         },
         {
             "type": "news",
             "category": "건강 · 보험 뉴스",
             "subtitle": "오늘의 핵심 소식 (1/5)",
-            "content": "1. 실손24 청구 전산화 본격 시행\n및 요양병원 간병비 급여화 확대 적용",
-            "script": "첫 번째 소식입니다. 실손24 청구 전산화가 본격 시행되며, 요양병원 간병비 급여화가 확대 적용됩니다.",
-            "duration": 10.0
+            "content": "• 실손24 청구 전산화 본격 시행\n• 요양병원 간병비 건강보험 급여화 확대\n• 비급여 1인실 및 도수치료 청구 강화",
+            "script": "첫 번째 건강 보험 소식입니다. 실손이십사 청구 전산화가 본격 시행되며, 요양병원 간병비 급여화가 확대 적용됩니다.",
+            "duration": 12.0
         },
         {
             "type": "news",
             "category": "부동산 경제 뉴스",
             "subtitle": "오늘의 핵심 소식 (2/5)",
-            "content": "2. 스트레스 DSR 2단계 시행 및\n서울 주요 지역 아파트 전세가 동향 점검",
-            "script": "두 번째 소식입니다. 스트레스 DSR 2단계가 시행되었으며, 서울 주요 지역의 아파트 전세가 동향을 점검합니다.",
-            "duration": 10.0
+            "content": "• 스트레스 DSR 2단계 본격 시행\n• 서울 주요 지역 아파트 전세가 상승세\n• 주택담보대출 한도 및 금리 동향 점검",
+            "script": "두 번째 부동산 경제 소식입니다. 스트레스 디에스알 이단계가 시행되었으며, 서울 주요 지역 전세가 동향을 점검합니다.",
+            "duration": 12.0
         },
         {
             "type": "news",
             "category": "국내외 금융 뉴스",
             "subtitle": "오늘의 핵심 소식 (3/5)",
-            "content": "3. AI 반도체 수출 호조 지속 및\n퇴직연금 실물이전 서비스 전격 안내",
-            "script": "세 번째 소식입니다. 인공지능 반도체 수출 호조가 지속되고 있으며, 퇴직연금 실물이전 서비스가 전격 시행됩니다.",
-            "duration": 10.0
+            "content": "• AI 반도체 수출 호조세 지속\n• 퇴직연금 실물이전 서비스 전격 시행\n• 금리 인하 기대 속 증시 및 환율 변동",
+            "script": "세 번째 금융 소식입니다. 인공지능 반도체 수출 호조가 지속되고, 퇴직연금 실물이전 서비스가 전격 시행됩니다.",
+            "duration": 12.0
         },
         {
             "type": "news",
             "category": "따뜻한 사회 뉴스",
             "subtitle": "오늘의 핵심 소식 (4/5)",
-            "content": "4. 독도의 날 기념 및 환절기\n산불 예방 및 생활 안전 종합 대책",
-            "script": "네 번째 소식입니다. 독도의 날을 맞아 환절기 산불 예방 및 생활 안전 종합 대책이 발표되었습니다.",
-            "duration": 10.0
+            "content": "• 독도의 날 맞이 기념 행사 개최\n• 환절기 산불 예방 특별 경계령\n• 겨울철 대비 생활 안전 종합 대책",
+            "script": "네 번째 사회 소식입니다. 독도의 날을 맞아 환절기 산불 예방 및 생활 안전 종합 대책이 발표되었습니다.",
+            "duration": 12.0
         },
         {
             "type": "news",
             "category": "알뜰 상식 뉴스",
             "subtitle": "오늘의 핵심 소식 (5/5)",
-            "content": "5. 숨은 보험금 10.3조원 통합 조회 및\n겨울철 난방비 절감 맞춤형 솔루션",
-            "script": "마지막 소식입니다. 숨은 보험금 10조 3천억 원 통합 조회 서비스와 겨울철 난방비 절감 맞춤형 솔루션을 안내해 드립니다.",
-            "duration": 10.0
+            "content": "• 숨은 보험금 10.3조원 통합 조회\n• 겨울철 난방비 절감 맞춤형 솔루션\n• 연말정산 대비 절세 가이드 안내",
+            "script": "마지막 상식 소식입니다. 숨은 보험금 십조 삼천억 원 통합 조회 서비스와 겨울철 난방비 절감 솔루션을 안내해 드립니다.",
+            "duration": 12.0
         },
         {
             "type": "outro",
             "script": "보험이 궁금할 땐 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 바랍니다.",
-            "duration": 9.0
+            "duration": 10.0
         }
     ]
 
@@ -110,7 +110,7 @@ def create_full_news_video_with_audio():
                 except Exception as e:
                     print(f"표지 프로필 이미지 합성 예외: {e}")
             draw.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 255, 255), font=font_large, anchor="mm")
-            draw.text((img_width//2, 650), "조간 뉴스 브리핑", fill=(180, 200, 220), font=font_title, anchor="mm")
+            draw.text((img_width//2, 650), "일일 80초 요약뉴스", fill=(180, 200, 220), font=font_title, anchor="mm")
             draw.text((img_width//2, 750), f"진행: 보험설계사 문성", fill=(255, 255, 255), font=font_body, anchor="mm")
             draw.text((img_width//2, 850), f"발행일: {today_str}", fill=(150, 170, 190), font=font_small, anchor="mm")
             
@@ -123,11 +123,11 @@ def create_full_news_video_with_audio():
             # 본문 카드 박스
             draw.rectangle([40, 240, img_width - 40, 1050], fill=(255, 255, 255), outline=(210, 215, 220), width=3)
             
-            # 뉴스 텍스트 줄바꿈 렌더링
+            # 다중 뉴스 텍스트 줄바꿈 렌더링 (간격 조정)
             lines = data['content'].split('\n')
-            y_start = 580 if len(lines) == 1 else 540
+            y_start = 520
             for i, line in enumerate(lines):
-                draw.text((img_width//2, y_start + (i * 60)), line, fill=(30, 30, 30), font=font_body, anchor="mm", align="center")
+                draw.text((60, y_start + (i * 90)), line, fill=(30, 30, 30), font=font_body, anchor="lm")
             
             # 하단 푸터
             draw.rectangle([0, img_height - 100, img_width, img_height], fill=(40, 50, 70))
@@ -149,14 +149,13 @@ def create_full_news_video_with_audio():
         # 이미지 클립 생성
         img_clip = ImageClip(img_path).set_duration(data["duration"])
         
-        # TTS 오디오 생성 및 오디오 길이에 맞춘 싱크 조절
+        # TTS 오디오 생성 및 오디오 싱크 조절
         audio_path = f"audio_{idx}.mp3"
         video_clip = None
         try:
             tts = gTTS(text=data["script"], lang="ko")
             tts.save(audio_path)
             audio_clip = AudioFileClip(audio_path)
-            # 음성 길이에 맞춰 슬라이드 재생 시간을 자동 조절하여 오디오가 잘리지 않도록 함
             actual_duration = max(data["duration"], audio_clip.duration + 0.3)
             img_clip = ImageClip(img_path).set_duration(actual_duration)
             video_clip = img_clip.set_audio(audio_clip)
@@ -169,7 +168,7 @@ def create_full_news_video_with_audio():
     try:
         final_video = concatenate_videoclips(clips, method="compose")
         final_video.write_videofile(filename, fps=24, codec="libx264", audio_codec="aac", logger=None)
-        print(f"최종 동영상 렌더링 완료: {filename}")
+        print(f"일일 80초 요약뉴스 최종 동영상 렌더링 완료: {filename}")
     except Exception as e:
         print(f"동영상 렌더링 중 오류 발생: {e}")
         with open(filename, "wb") as f:
@@ -179,7 +178,7 @@ def create_full_news_video_with_audio():
 
 def send_email_with_video(video_path, receiver_email):
     """
-    완성된 멀티 슬라이드 오디오 MP4 영상을 Gmail(465 보안 포트)로 자동 발송합니다.
+    완성된 일일 80초 요약뉴스 MP4 영상을 Gmail(465 보안 포트)로 자동 발송합니다.
     """
     sender_email = "pmsung00@gmail.com"  
     sender_password = "efumyhjmxxugdfaw"  
@@ -187,13 +186,14 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 조간 뉴스 브리핑 75초 완성본"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 일일 80초 요약뉴스 최종본"
     
     body = f"""
 안녕하세요, 문성 형님!
-오늘 조간 5대 분야 핵심 뉴스 브리핑 '7개 멀티 슬라이드 음성 동영상'이 완벽하게 수정 완성되었습니다.
+오늘 조간 5대 분야 핵심 뉴스 브리핑 '일일 80초 요약뉴스' 최종 완성본이 제작되었습니다.
 
-표지(프로필 사진), 5대 주요 뉴스 각각의 카드와 내용, 엔딩 화면 및 자연스러운 음성 오디오가 모두 정상 반영되었으며,
+각 분야별로 3가지 핵심 뉴스 포인트가 알차게 카드에 담겼으며, 
+프로필 표지, 80초 런타임 음성 오디오 및 엔딩 화면이 모두 완벽하게 싱크되었습니다.
 첨부된 MP4 동영상 파일을 다운로드하시어 카카오톡으로 바로 공유하실 수 있습니다.
 
 오늘도 활기차고 멋진 하루 보내시길 응원합니다!
@@ -218,7 +218,7 @@ def send_email_with_video(video_path, receiver_email):
         text = msg.as_string()
         server.sendmail(sender_email, receiver_email, text)
         server.quit()
-        print(f"이메일 발송 성공: {receiver_email}로 완성본 동영상이 전송되었습니다.")
+        print(f"이메일 발송 성공: {receiver_email}로 요약뉴스 동영상이 전송되었습니다.")
     except Exception as e:
         print(f"이메일 발송 실패: {e}")
 
