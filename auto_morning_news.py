@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 완전체 버전 (한국 시간 패치, 톱 뉴스 엄선, 가독성 강화)
+# 박씨네 보험톡 방송국 - 최종 80초 버전 (중복 뉴스 제거, 하단 가독성, 숏폼 낭독)
 # ==============================================================================
 
 import os
@@ -19,12 +19,9 @@ from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
 # ------------------------------------------------------------------------------
-# 1. 봇 차단 없는 고품질 톱 뉴스 크롤러 (주요 언론사 헤드라인 위주)
+# 1. 봇 차단 없는 고품질 톱 뉴스 크롤러 (중복 뉴스 완벽 제거)
 # ------------------------------------------------------------------------------
 def fetch_top_news(keyword, is_general_top=False):
-    """찌라시를 걸러내고 구글의 주요 언론사 톱 헤드라인 위주로 수집합니다."""
-    
-    # 상식/사회 등은 구글 코리아 전체 톱 헤드라인 RSS 활용, 나머지는 키워드 검색
     if is_general_top:
         url = "https://news.google.com/news/rss?hl=ko&gl=KR&ceid=KR:ko"
     else:
@@ -40,11 +37,17 @@ def fetch_top_news(keyword, is_general_top=False):
         
         for item in root.findall('.//item'):
             title = item.find('title').text
-            # ' - 언론사명' 꼬리표 떼어내기
             clean_title = title.rsplit(' - ', 1)[0]
             
-            # 너무 짧거나 이상한 기사 필터링
-            if len(clean_title) > 8 and clean_title not in headlines:
+            # [수정] 너무 짧은 기사 필터링 및 "비슷한 제목(중복)" 완벽 제거
+            is_duplicate = False
+            for existing in headlines:
+                # 앞 10글자가 같으면 같은 기사로 간주하고 패스
+                if clean_title[:10] == existing[:10]: 
+                    is_duplicate = True
+                    break
+                    
+            if len(clean_title) > 8 and not is_duplicate:
                 headlines.append(clean_title)
                 
             if len(headlines) == 5:
@@ -89,11 +92,10 @@ def get_circular_avatar(img_path, size=(300, 300)):
 # 4. 메인 렌더링 엔진
 # ------------------------------------------------------------------------------
 def create_full_news_video_with_audio():
-    # [핵심] 깃허브 UTC 시간에 9시간을 더해서 무조건 한국 시간(KST)으로 맞춤!
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 톱 뉴스 엄선 및 한국 시간 렌더링 시작...")
+    print(f"[{today_str}] 80초 숏폼 요약뉴스 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -106,42 +108,41 @@ def create_full_news_video_with_audio():
     except:
         font_large = font_title = font_body = font_small = ImageFont.load_default()
 
-    # 엄선된 주요 언론사 키워드 기반 뉴스 수집
     health_news = fetch_top_news("국민건강보험 OR 실손의료보험 OR 보건복지부 주요뉴스")
     econ_news = fetch_top_news("한국은행 금리 OR 부동산 시장 OR 아파트 주요뉴스")
     finance_news = fetch_top_news("국내 증시 KOSPI OR 미국 증시 OR 환율 주요뉴스")
-    social_news = fetch_top_news("", is_general_top=True) # 대한민국 전체 톱 헤드라인
+    social_news = fetch_top_news("", is_general_top=True)
     tip_news = fetch_top_news("연말정산 OR 세금 혜택 OR 정부 지원금 주요뉴스")
 
-    # 지루하지 않게 앵커처럼 핵심만 짚고 빠르게 넘어가는 낭독 대본!
-    def make_anchor_script(intro, news_list):
-        return f"{intro} 오늘 가장 주목받은 주요 기사입니다. 첫째, {news_list[0]}. 둘째, {news_list[1]}. 셋째, {news_list[2]}. 넷째, {news_list[3]}. 마지막으로 {news_list[4]}. 이상입니다."
+    # [수정] 오디오 길이 단축: 5개를 다 읽으면 5분이 되므로, 가장 핫한 1번 뉴스만 짧고 강렬하게 읽어줍니다. (총 80~90초로 단축)
+    def make_short_script(intro, news_list):
+        return f"{intro} 오늘 주목할 첫 번째 뉴스는 {news_list[0]} 입니다. 그 외 화면의 주요 소식들도 함께 확인해 보시죠."
 
     news_database = [
         {
             "category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "insurance",
             "items": health_news,
-            "script": make_anchor_script("건강 보험 소식입니다.", health_news)
+            "script": make_short_script("건강 보험 소식입니다.", health_news)
         },
         {
             "category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "domestic_econ",
             "items": econ_news,
-            "script": make_anchor_script("부동산 경제 소식입니다.", econ_news)
+            "script": make_short_script("부동산 경제 소식입니다.", econ_news)
         },
         {
             "category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "finance",
             "items": finance_news,
-            "script": make_anchor_script("국내외 금융 소식입니다.", finance_news)
+            "script": make_short_script("국내외 금융 소식입니다.", finance_news)
         },
         {
             "category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "social",
             "items": social_news,
-            "script": make_anchor_script("오늘의 톱 사회 소식입니다.", social_news)
+            "script": make_short_script("오늘의 톱 사회 소식입니다.", social_news)
         },
         {
             "category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "tip",
             "items": tip_news,
-            "script": make_anchor_script("놓치면 안 될 생활 상식입니다.", tip_news)
+            "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)
         }
     ]
 
@@ -183,11 +184,12 @@ def create_full_news_video_with_audio():
             draw_ov.text((img_width//2, 720), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
             draw_ov.text((img_width//2, 800), "일일 주요뉴스", fill=(180, 200, 230, 255), font=font_title, anchor="mm")
             draw_ov.text((img_width//2, 920), "박씨네 보험톡 제공", fill=(255, 215, 0, 255), font=font_body, anchor="mm")
-            # 강제 한국 시간 날짜 적용 완료!
             draw_ov.text((img_width//2, 980), f"발행일: {today_str}", fill=(130, 150, 180, 255), font=font_small, anchor="mm")
             
         elif data["type"] == "news":
             draw_ov.rectangle([0, 100, img_width, 110], fill=data["accent"]+(255,))
+            
+            # 본문 뉴스 텍스트용 반투명 박스
             draw_ov.rectangle([20, 120, img_width - 20, 1120], fill=(0, 0, 0, 230), outline=data["accent"]+(255,), width=3)
             
             draw_ov.text((50, 160), f"■ {data['category']}", fill=data["accent"]+(255,), font=font_large)
@@ -199,7 +201,8 @@ def create_full_news_video_with_audio():
                 draw_ov.text((50, y_start), f"• {wrapped_text}", fill=(255, 255, 255, 255), font=font_body, anchor="la")
                 y_start += 150 
             
-            draw_ov.line([(40, 1150), (img_width-40, 1150)], fill=(80, 90, 110, 255), width=1)
+            # [수정] 하단 "구독과 좋아요" 문구를 위한 전용 반투명 블랙 박스 추가! (가독성 100%)
+            draw_ov.rectangle([40, 1170, img_width - 40, 1230], fill=(0, 0, 0, 200), outline=(80, 90, 110, 255), width=1)
             draw_ov.text((img_width//2, 1200), "구독과 좋아요는 큰 힘이 됩니다 - 박씨네 보험톡", fill=(200, 210, 220, 255), font=font_small, anchor="mm")
             
         elif data["type"] == "outro":
@@ -226,17 +229,17 @@ def create_full_news_video_with_audio():
         
         audio_path = f"audio_{idx}.mp3"
         try:
-            # 기본 속도로 또박또박하게 읽어줌
             tts = gTTS(text=data["script"], lang="ko")
             tts.save(audio_path)
             audio_clip = AudioFileClip(audio_path)
             
-            actual_duration = audio_clip.duration + 2.0
+            # 읽는 속도가 짧아졌으므로 넉넉하게 3초 버퍼를 줘서 다음 화면으로 자연스럽게 넘어가게 함
+            actual_duration = audio_clip.duration + 3.0
             img_clip = ImageClip(img_path).set_duration(actual_duration)
             video_clip = img_clip.set_audio(audio_clip)
         except Exception as e:
             print(f"슬라이드 {idx} 오디오 예외: {e}")
-            video_clip = ImageClip(img_path).set_duration(10.0)
+            video_clip = ImageClip(img_path).set_duration(8.0)
             
         clips.append(video_clip)
 
@@ -252,36 +255,9 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 완전체 마스터본"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (80초 숏폼 버전)"
     
     body = f"""
-형! 아침에 지적해 준 문제점 3가지 완벽하게 타파했어!
+형! 아침 방송용 80초 숏폼 완벽 버전 도착했어!
 
-1. 한국 시간(KST) 고정: 깃허브가 미국에 있어도 무조건 한국 시간 +9시간 더해서 오늘 날짜(26일) 정확히 찍히게 했어!
-2. 진짜 톱 뉴스 엄선: 이상한 찌라시 달러($) 뉴스 다 거르고, 주요 언론사의 대한민국 전체 톱 헤드라인 위주로만 영양가 있게 뽑아와!
-3. 지루하지 않은 낭독: 목소리를 여자로 못 바꾸는 대신, 앵커처럼 '첫째, 둘째...' 핵심만 딱딱 짚어주게 대본을 빠르고 명쾌하게 고쳤어!
-
-진짜 마지막 테스트 돌려보고 마음 편히 밥 먹자 형!! 
-    """
-    msg.attach(MIMEText(body, 'plain'))
-    
-    try:
-        with open(video_path, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
-        msg.attach(part)
-    except: pass
-
-    try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, receiver_email, text)
-        server.quit()
-    except: pass
-
-if __name__ == "__main__":
-    video_file = create_full_news_video_with_audio()
-    send_email_with_video(video_file, "pmsung00@gmail.com")
+1. 중복 뉴스 삭제: 5개가 똑같은 뉴
