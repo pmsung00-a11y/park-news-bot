@@ -114,7 +114,6 @@ def create_full_news_video_with_audio():
     social_news = fetch_top_news("", is_general_top=True)
     tip_news = fetch_top_news("연말정산 OR 세금 혜택 OR 정부 지원금 주요뉴스")
 
-    # [수정] 오디오 길이 단축: 5개를 다 읽으면 5분이 되므로, 가장 핫한 1번 뉴스만 짧고 강렬하게 읽어줍니다. (총 80~90초로 단축)
     def make_short_script(intro, news_list):
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {news_list[0]} 입니다. 그 외 화면의 주요 소식들도 함께 확인해 보시죠."
 
@@ -201,7 +200,7 @@ def create_full_news_video_with_audio():
                 draw_ov.text((50, y_start), f"• {wrapped_text}", fill=(255, 255, 255, 255), font=font_body, anchor="la")
                 y_start += 150 
             
-            # [수정] 하단 "구독과 좋아요" 문구를 위한 전용 반투명 블랙 박스 추가! (가독성 100%)
+            # 하단 "구독과 좋아요" 문구를 위한 전용 반투명 블랙 박스
             draw_ov.rectangle([40, 1170, img_width - 40, 1230], fill=(0, 0, 0, 200), outline=(80, 90, 110, 255), width=1)
             draw_ov.text((img_width//2, 1200), "구독과 좋아요는 큰 힘이 됩니다 - 박씨네 보험톡", fill=(200, 210, 220, 255), font=font_small, anchor="mm")
             
@@ -233,7 +232,6 @@ def create_full_news_video_with_audio():
             tts.save(audio_path)
             audio_clip = AudioFileClip(audio_path)
             
-            # 읽는 속도가 짧아졌으므로 넉넉하게 3초 버퍼를 줘서 다음 화면으로 자연스럽게 넘어가게 함
             actual_duration = audio_clip.duration + 3.0
             img_clip = ImageClip(img_path).set_duration(actual_duration)
             video_clip = img_clip.set_audio(audio_clip)
@@ -257,7 +255,34 @@ def send_email_with_video(video_path, receiver_email):
     msg['To'] = receiver_email
     msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (80초 숏폼 버전)"
     
-    body = f"""
+    body = """
 형! 아침 방송용 80초 숏폼 완벽 버전 도착했어!
 
-1. 중복 뉴스 삭제: 5개가 똑같은 뉴
+1. 중복 뉴스 삭제: 5개가 똑같은 뉴스로 도배되던 버그 완벽 수정! 다 다른 핫한 뉴스로만 채워져!
+2. 시간 단축 (5분 -> 1분 20초): 눈으로는 5개를 다 보되, 귀로는 제일 중요한 1번 뉴스만 팍팍 짚어줘서 구독자들이 지루할 틈이 없어!
+3. 하단 문구 가독성 업: 맨 아래 '구독과 좋아요' 부분에도 까만 박스를 깔아서 어떤 배경에서도 100% 뚜렷하게 보여!
+
+이걸로 덮어씌워서 런타임 확 줄이고 구독자들한테 진짜 '요약 뉴스'의 진수를 보여주자 형!!
+    """
+    msg.attach(MIMEText(body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
+        msg.attach(part)
+    except: pass
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+    except: pass
+
+if __name__ == "__main__":
+    video_file = create_full_news_video_with_audio()
+    send_email_with_video(video_file, "pmsung00@gmail.com")
