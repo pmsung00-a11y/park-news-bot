@@ -37,8 +37,8 @@ def send_email_with_video(video_path, receiver_email):
     """
     생성된 MP4 영상을 Gmail SMTP를 통해 형님의 이메일로 자동 발송합니다.
     """
-    sender_email = "your_email@gmail.com"  # 형님의 지메일 주소 입력
-    sender_password = "your_app_password"  # 지메일 앱 비밀번호 (16자리)
+    sender_email = "pmsung00@gmail.com"  # 형님의 지메일 주소 입력
+    sender_password = "pnli zehq mwsx sjbo"  # 지메일 앱 비밀번호 (16자리)
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -89,6 +89,12 @@ def send_email_with_video(video_path, receiver_email):
         print(f"이메일 발송 실패: {e}")
 
 if __name__ == "__main__":
-    # 테스트 실행
+    # 1. 뉴스 브리핑 영상 생성 실행
     video_file = create_news_briefing_video()
-    # send_email_with_video(video_file, "brother@naver.com")
+    
+    # 2. 형님의 지메일로 완성된 영상 자동 발송 실행
+    # (아래의 "형님의지메일@gmail.com" 부분에 실제 형님 지메일 주소를 적어주세요!)
+    receiver_email = "pmsung00@gmail.com"
+    
+    print(f"지메일 발송 준비 중... 수신자: {receiver_email}")
+    send_email_with_video(video_file, receiver_email)
