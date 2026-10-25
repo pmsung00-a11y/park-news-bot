@@ -2,27 +2,27 @@ name: Park News Bot Daily Run
 
 on:
   schedule:
-    - cron: '0 20 * * 0-4'
-  workflow_dispatch:
+    # 깃허브는 UTC 기준이라 20:00으로 해야 한국 시간 다음날 아침 5시 정각에 실행됨!
+    - cron: '0 20 * * *'
+  workflow_dispatch: # 언제든 수동으로 버튼 눌러서 실행할 수 있게 해주는 마법의 버튼
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Install System Dependencies & Python Packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-nanum ffmpeg
-          pip install "moviepy==1.0.3" gtts pillow requests
+    - name: Install System Dependencies & Python Packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y fonts-nanum ffmpeg
+        pip install Pillow gTTS moviepy==1.0.3 requests
 
-      - name: Run news briefing bot
-        run: |
-          python auto_morning_news.py
+    - name: Run news briefing bot
+      run: python auto_morning_news.py
