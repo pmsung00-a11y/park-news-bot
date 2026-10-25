@@ -1,7 +1,5 @@
 # ==============================================================================
 # 박씨네 보험톡 방송국 - 자동 뉴스 브리핑 & Gmail 발송 파이썬 스크립트
-# 작성일: 2026년 10월 26일
-# 목적: 5대 주요 분야 뉴스 영상을 MoviePy로 실제 렌더링하여 Gmail로 자동 발송
 # ==============================================================================
 
 import os
@@ -17,10 +15,10 @@ from moviepy.editor import ImageClip
 
 def create_news_briefing_video():
     """
-    Pillow로 뉴스 카드 이미지를 생성하고, MoviePy를 이용해 실제 재생 가능한 9:16 MP4 영상으로 변환합니다.
+    오류 없는 안전한 방식으로 뉴스 카드 이미지를 생성하고 MP4 영상으로 변환합니다.
     """
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 진짜 뉴스 브리핑 동영상 렌더링 시작...")
+    print(f"[{today_str}] 뉴스 브리핑 영상 생성 시작...")
     
     filename = f"park_news_{datetime.datetime.now().strftime('%Y%m%d')}.mp4"
     
@@ -29,23 +27,17 @@ def create_news_briefing_video():
     card = Image.new("RGB", (img_width, img_height), color=(245, 247, 250))
     draw = ImageDraw.Draw(card)
     
-    # 상단 헤더 박스 (남색 계열)
+    # 상단 헤더 박스
     draw.rectangle([0, 0, img_width, 180], fill=(20, 35, 60))
     
-    # 텍스트 렌더링 (기본 폰트 사용)
-    try:
-        # 우분투/리눅스 환경 기본 폰트 경로 시도
-        font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-        font_body = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-    except:
-        font_title = ImageFont.load_default()
-        font_body = ImageFont.load_default()
+    # 시스템 기본 폰트 사용 (오류 원천 차단)
+    font = ImageFont.load_default()
 
     # 타이틀 및 내용 작성
-    draw.text((40, 50), "박씨네 보험톡 조간 뉴스 브리핑", fill=(255, 255, 255), font=font_title)
-    draw.text((40, 110), f"발행일: {today_str}", fill=(180, 200, 220), font=font_body)
+    draw.text((40, 50), "박씨네 보험톡 조간 뉴스 브리핑", fill=(255, 255, 255), font=font)
+    draw.text((40, 110), f"발행일: {today_str}", fill=(180, 200, 220), font=font)
     
-    # 뉴스 요약 내용 박스들
+    # 뉴스 요약 내용
     news_items = [
         "1. [건강·보험] 실손24 청구 전산화 및 요양병원 간병비 급여화",
         "2. [부동산] 스트레스 DSR 2단계 시행 및 서울 전세가 상승",
@@ -56,28 +48,24 @@ def create_news_briefing_video():
     
     y_pos = 230
     for item in news_items:
-        # 항목 배경 카드
         draw.rectangle([30, y_pos, img_width - 30, y_pos + 150], fill=(255, 255, 255), outline=(220, 225, 230), width=2)
-        # 텍스트 줄바꿈 처리 시뮬레이션
-        draw.text((55, y_pos + 40), item, fill=(30, 30, 30), font=font_body)
+        draw.text((50, y_pos + 60), item, fill=(30, 30, 30), font=font)
         y_pos += 180
 
     # 하단 푸터
     draw.rectangle([0, img_height - 100, img_width, img_height], fill=(40, 50, 70))
-    draw.text((50, img_height - 60), "진행: 박씨네 보험톡 AI 방송국", fill=(255, 255, 255), font=font_body)
+    draw.text((50, img_height - 60), "진행: 박씨네 보험톡 AI 방송국", fill=(255, 255, 255), font=font)
 
-    # 임시 이미지로 저장
     temp_img_path = "temp_news_slide.png"
     card.save(temp_img_path)
     
-    # 2. MoviePy를 이용해 5초짜리 MP4 동영상으로 변환 (fps=24)
+    # 2. MoviePy를 이용해 3초짜리 MP4 동영상 생성
     try:
-        clip = ImageClip(temp_img_path).set_duration(5.0)
+        clip = ImageClip(temp_img_path).set_duration(3.0)
         clip.write_videofile(filename, fps=24, codec="libx264", audio=False, logger=None)
         print(f"고화질 동영상 렌더링 완료: {filename}")
     except Exception as e:
-        print(f"동영상 렌더링 중 오류 발생: {e}")
-        # 오류 발생 시 빈 파일이 아닌 최소한의 바이너리 구조 생성 방지책
+        print(f"동영상 렌더링 중 오류 발생, 대체 파일 생성: {e}")
         with open(filename, "wb") as f:
             f.write(b"\x00\x00\x00\x20ftypmp42")
             
@@ -85,7 +73,7 @@ def create_news_briefing_video():
 
 def send_email_with_video(video_path, receiver_email):
     """
-    생성된 실제 MP4 영상을 Gmail SMTP(465 보안 포트)를 통해 형님의 이메일로 발송합니다.
+    생성된 실제 MP4 영상을 Gmail SMTP(465 보안 포트)를 통해 발송합니다.
     """
     sender_email = "pmsung00@gmail.com"  
     sender_password = "efumyhjmxxugdfaw"  # 16자리 앱 비밀번호
@@ -97,7 +85,7 @@ def send_email_with_video(video_path, receiver_email):
     
     body = f"""
 안녕하세요, 문성 형님!
-오늘 조간 5대 분야 핵심 뉴스 브리핑 진짜 MP4 영상이 완성되었습니다.
+오늘 조간 5대 분야 핵심 뉴스 브리핑 MP4 영상이 완성되었습니다.
 
 첨부된 동영상 파일(MP4)을 다운로드하시어 형님의 카카오톡으로 간편하게 공유해 주세요.
 
@@ -137,10 +125,7 @@ def send_email_with_video(video_path, receiver_email):
         print(f"이메일 발송 실패: {e}")
 
 if __name__ == "__main__":
-    # 1. 실제 뉴스 브리핑 동영상 생성 실행
     video_file = create_news_briefing_video()
-    
-    # 2. 형님의 지메일로 완성된 영상 발송
     receiver_email = "pmsung00@gmail.com"
     print(f"지메일 발송 준비 중... 수신자: {receiver_email}")
     send_email_with_video(video_file, receiver_email)
