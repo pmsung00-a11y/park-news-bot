@@ -78,7 +78,6 @@ def send_email_with_video(video_path, receiver_email):
 
 # Gmail 서버 연결 및 발송 (465 보안 포트 방식)
     try:
-        # 587 대신 465 SSL 포트 사용으로 보안 차단 우회
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         text = msg.as_string()
