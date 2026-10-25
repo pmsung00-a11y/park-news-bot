@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 럭셔리 마스터 버전 (심플 배경, 텍스트 정렬, 대시보드 완벽)
+# 박씨네 보험톡 방송국 - 럭셔리 마스터 버전 (둥근 모서리 에러 완벽 수정)
 # ==============================================================================
 
 import os
@@ -45,7 +45,7 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 2. 경제 지표 수집 (더욱 강력해진 파싱 로직)
+# 2. 경제 지표 수집
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "수집중", "kosdaq": "수집중", "usd": "수집중"}
@@ -89,7 +89,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
     except Exception:
         return None
 
-# [신규] 완벽한 내어쓰기(Hanging Indent) 텍스트 그리기 함수
+# 완벽한 내어쓰기(Hanging Indent) 텍스트 그리기 함수
 def draw_hanging_indent_text(draw, text, font, start_x, start_y, max_width, fill_color):
     words = text.split(' ')
     lines = []
@@ -97,7 +97,6 @@ def draw_hanging_indent_text(draw, text, font, start_x, start_y, max_width, fill
     
     for word in words:
         test_line = current_line + word + " "
-        # 글자 길이 계산
         bbox = draw.textbbox((0, 0), test_line, font=font)
         if bbox[2] <= max_width:
             current_line = test_line
@@ -106,16 +105,15 @@ def draw_hanging_indent_text(draw, text, font, start_x, start_y, max_width, fill
             current_line = word + " "
     lines.append(current_line)
     
-    # 점(• )의 너비만큼 두 번째 줄부터 들여쓰기 적용
     bullet_offset = draw.textbbox((0, 0), "• ", font=font)[2]
     
     y = start_y
-    line_spacing = 45 # 줄간격 넉넉하게
+    line_spacing = 45 
     for i, line in enumerate(lines):
         x = start_x if i == 0 else start_x + bullet_offset
         draw.text((x, y), line, fill=fill_color, font=font, anchor="la")
         y += line_spacing
-    return y + 25 # 다음 뉴스와의 간격
+    return y + 25 
 
 # ------------------------------------------------------------------------------
 # 4. 메인 렌더링 엔진
@@ -165,7 +163,6 @@ def create_full_news_video_with_audio():
     clips = []
     
     for idx, data in enumerate(slides_data, start=1):
-        # 표지와 마지막 장은 단일 딥 네이비(Solid Dark Navy) 적용
         if data["type"] in ["cover", "outro"]:
             slide = Image.new("RGB", (img_width, img_height), color=(12, 18, 32))
         else:
@@ -188,16 +185,16 @@ def create_full_news_video_with_audio():
                 if avatar:
                     overlay.paste(avatar, (img_width//2 - 170, 150), avatar)
             
-            # [신규] 표지 디자인 고급화 (글자 크기 UP, 색상 포인트)
             draw_ov.text((img_width//2, 550), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
             draw_ov.text((img_width//2, 650), "일일 주요뉴스", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
             
-            draw_ov.rectangle([img_width//2 - 120, 720, img_width//2 + 120, 770], fill=(255, 255, 255, 20), radius=25)
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([img_width//2 - 120, 720, img_width//2 + 120, 770], fill=(255, 255, 255, 20), radius=25)
             draw_ov.text((img_width//2, 745), f"발행일 : {today_str}", fill=(180, 200, 230, 255), font=font_small, anchor="mm")
             
-            # 경제 지표 대시보드
             dash_y = 860
-            draw_ov.rectangle([40, dash_y, img_width - 40, dash_y + 260], fill=(0, 0, 0, 150), outline=(80, 90, 110, 255), width=2, radius=15)
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([40, dash_y, img_width - 40, dash_y + 260], fill=(0, 0, 0, 150), outline=(80, 90, 110, 255), width=2, radius=15)
             draw_ov.text((img_width//2, dash_y + 40), "📈 오늘의 주요 경제 지표 (전일 기준)", fill=(255, 215, 0, 255), font=font_body, anchor="mm")
             draw_ov.line([(60, dash_y + 80), (img_width-60, dash_y + 80)], fill=(80, 90, 110, 255), width=1)
             
@@ -211,19 +208,20 @@ def create_full_news_video_with_audio():
             draw_ov.text((img_width - 70, dash_y + 235), eco_data["usd"], fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
         elif data["type"] == "news":
-            # [신규] 카테고리 뱃지 디자인
             draw_ov.rectangle([0, 90, img_width, 100], fill=data["accent"]+(255,))
-            draw_ov.rectangle([40, 130, 350, 190], fill=data["accent"]+(200,), radius=10)
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([40, 130, 350, 190], fill=data["accent"]+(200,), radius=10)
             draw_ov.text((60, 160), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="lm")
             
-            draw_ov.rectangle([30, 230, img_width - 30, 1140], fill=(0, 0, 0, 180), outline=data["accent"]+(150,), width=2, radius=15)
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([30, 230, img_width - 30, 1140], fill=(0, 0, 0, 180), outline=data["accent"]+(150,), width=2, radius=15)
             
             y_start = 270 
             for item in data['items']:
-                # [신규] 완벽한 내어쓰기 적용
                 y_start = draw_hanging_indent_text(draw_ov, item, font_body, 55, y_start, 600, (245, 250, 255, 255))
             
-            draw_ov.rectangle([40, 1170, img_width - 40, 1230], fill=(0, 0, 0, 200), outline=(80, 90, 110, 255), width=1, radius=10)
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([40, 1170, img_width - 40, 1230], fill=(0, 0, 0, 200), outline=(80, 90, 110, 255), width=1, radius=10)
             draw_ov.text((img_width//2, 1200), "구독과 좋아요는 큰 힘이 됩니다 - 박씨네 보험톡", fill=(200, 210, 220, 255), font=font_small, anchor="mm")
             
         elif data["type"] == "outro":
@@ -236,8 +234,8 @@ def create_full_news_video_with_audio():
             draw_ov.text((img_width//2, 500), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             draw_ov.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
             
-            draw_ov.rectangle([80, 700, img_width - 80, 960], fill=(0, 0, 0, 150), outline=(100, 120, 150, 255), width=2, radius=15)
-            # [신규] 이모티콘 깨짐 방지 텍스트 디자인
+            # 에러 수정: 모서리가 둥근 박스는 rounded_rectangle 사용
+            draw_ov.rounded_rectangle([80, 700, img_width - 80, 960], fill=(0, 0, 0, 150), outline=(100, 120, 150, 255), width=2, radius=15)
             draw_ov.text((img_width//2, 760), "[문의전화] 010-2062-4600", fill=(255, 255, 255, 255), font=font_body, anchor="mm")
             draw_ov.text((img_width//2, 830), "[카카오톡] PMSUNGOO", fill=(255, 255, 255, 255), font=font_body, anchor="mm")
             draw_ov.text((img_width//2, 900), "[블로그] blog.naver.com/insureeasy", fill=(255, 255, 255, 255), font=font_body, anchor="mm")
