@@ -76,10 +76,10 @@ def send_email_with_video(video_path, receiver_email):
         print(f"파일 첨부 중 오류 발생: {e}")
         return
 
-    # Gmail 서버 연결 및 발송
+# Gmail 서버 연결 및 발송 (465 보안 포트 방식)
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
+        # 587 대신 465 SSL 포트 사용으로 보안 차단 우회
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         text = msg.as_string()
         server.sendmail(sender_email, receiver_email, text)
