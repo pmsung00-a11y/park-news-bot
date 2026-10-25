@@ -2,7 +2,6 @@ name: Park News Bot Daily Run
 
 on:
   schedule:
-    # 매주 월~금요일 한국 시간 아침 5시 (UTC 시간 기준 밤 8시)에 실행
     - cron: '0 20 * * 0-4'
   workflow_dispatch:
 
@@ -18,9 +17,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install Korean Fonts and Dependencies
         run: |
-          pip install moviepy gtts pillow requests
+          sudo apt-get update
+          sudo apt-get install -y fonts-nanum
+          pip install pillow requests
 
       - name: Run news briefing bot
         run: |
