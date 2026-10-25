@@ -1,7 +1,7 @@
 # ==============================================================================
 # 박씨네 보험톡 방송국 - 자동 뉴스 브리핑 & Gmail 발송 파이썬 스크립트
 # 작성일: 2026년 10월 26일
-# 목적: 5대 주요 분야 뉴스 카드 이미지를 생성하여 Gmail로 자동 발송
+# 목적: 5대 주요 분야 나눔고딕 한글 카드 뉴스 생성 및 Gmail 자동 발송
 # ==============================================================================
 
 import os
@@ -16,10 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 def create_news_briefing_image():
     """
-    Pillow를 이용해 깔끔하고 선명한 9:16 세로형 뉴스 브리핑 카드 이미지를 생성합니다.
+    나눔고딕 폰트를 사용하여 선명하고 깨끗한 9:16 세로형 뉴스 카드 이미지를 생성합니다.
     """
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 뉴스 브리핑 카드 이미지 생성 시작...")
+    print(f"[{today_str}] 나눔고딕 한글 뉴스 카드 이미지 생성 시작...")
     
     filename = f"park_news_{datetime.datetime.now().strftime('%Y%m%d')}.png"
     
@@ -31,12 +31,18 @@ def create_news_briefing_image():
     # 상단 헤더 박스 (남색 계열)
     draw.rectangle([0, 0, img_width, 180], fill=(20, 35, 60))
     
-    # 시스템 기본 폰트 사용 (오류 원천 차단)
-    font = ImageFont.load_default()
+    # 우분투 리눅스에 설치된 나눔고딕 폰트 로드 (한글 완벽 지원)
+    font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+    try:
+        font_title = ImageFont.truetype(font_path, 36)
+        font_body = ImageFont.truetype(font_path, 24)
+    except:
+        font_title = ImageFont.load_default()
+        font_body = ImageFont.load_default()
 
     # 타이틀 및 내용 작성
-    draw.text((40, 50), "박씨네 보험톡 조간 뉴스 브리핑", fill=(255, 255, 255), font=font)
-    draw.text((40, 110), f"발행일: {today_str}", fill=(180, 200, 220), font=font)
+    draw.text((40, 50), "박씨네 보험톡 조간 뉴스 브리핑", fill=(255, 255, 255), font=font_title)
+    draw.text((40, 110), f"발행일: {today_str}", fill=(180, 200, 220), font=font_body)
     
     # 뉴스 요약 내용 박스들
     news_items = [
@@ -50,24 +56,24 @@ def create_news_briefing_image():
     y_pos = 230
     for item in news_items:
         draw.rectangle([30, y_pos, img_width - 30, y_pos + 150], fill=(255, 255, 255), outline=(220, 225, 230), width=2)
-        draw.text((50, y_pos + 60), item, fill=(30, 30, 30), font=font)
+        draw.text((50, y_pos + 60), item, fill=(30, 30, 30), font=font_body)
         y_pos += 180
 
     # 하단 푸터
     draw.rectangle([0, img_height - 100, img_width, img_height], fill=(40, 50, 70))
-    draw.text((50, img_height - 60), "진행: 박씨네 보험톡 AI 방송국", fill=(255, 255, 255), font=font)
+    draw.text((50, img_height - 60), "진행: 박씨네 보험톡 AI 방송국", fill=(255, 255, 255), font=font_body)
 
     # 이미지 저장
     card.save(filename)
-    print(f"뉴스 카드 이미지 생성 완료: {filename}")
+    print(f"한글 뉴스 카드 이미지 생성 완료: {filename}")
     return filename
 
 def send_email_with_news(image_path, receiver_email):
     """
-    생성된 뉴스 카드 이미지를 형님의 Gmail(465 보안 포트)로 자동 발송합니다.
+    생성된 한글 뉴스 카드를 형님의 Gmail(465 보안 포트)로 자동 발송합니다.
     """
     sender_email = "pmsung00@gmail.com"  
-    sender_password = "efumyhjmxxugdfaw"  # 형님이 새로 알려주신 16자리 앱 비밀번호 반영
+    sender_password = "efumyhjmxxugdfaw"  # 새로운 16자리 앱 비밀번호 적용
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -76,7 +82,7 @@ def send_email_with_news(image_path, receiver_email):
     
     body = f"""
 안녕하세요, 문성 형님!
-오늘 조간 5대 분야 핵심 뉴스 브리핑 카드 뉴스가 완성되었습니다.
+오늘 조간 5대 분야 핵심 뉴스 브리핑 카드 뉴스가 나눔고딕 폰트로 깨끗하게 완성되었습니다.
 
 첨부된 이미지 파일(PNG)을 다운로드하시어 형님의 카카오톡이나 방송 채널에 간편하게 공유해 주세요.
 
@@ -116,7 +122,7 @@ def send_email_with_news(image_path, receiver_email):
         print(f"이메일 발송 실패: {e}")
 
 if __name__ == "__main__":
-    # 1. 뉴스 카드 이미지 생성 실행
+    # 1. 한글 뉴스 카드 이미지 생성 실행
     news_image = create_news_briefing_image()
     
     # 2. 형님의 지메일로 자동 발송
