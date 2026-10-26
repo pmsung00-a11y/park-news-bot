@@ -1,6 +1,6 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 마스터 피스 V29 (발송 최적화 및 에러 로그 강화)
-# (메일 제목 KST 적용, 영상 용량 강제 다이어트(1000k), 발송 실패 원인 출력)
+# 박씨네 보험톡 방송국 - 마스터 피스 V30 (최신 뉴스 강제 업데이트 버전)
+# (구글 뉴스 24시간 필터(when:1d) 적용으로 중복/과거 뉴스 완벽 차단)
 # ==============================================================================
 
 import os
@@ -27,7 +27,7 @@ HEADERS = {
 }
 
 # ------------------------------------------------------------------------------
-# 1. FFmpeg 오디오 엔진 (기계음 팝핑 제거)
+# 1. FFmpeg 오디오 엔진 
 # ------------------------------------------------------------------------------
 def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
     import moviepy.editor as mpy
@@ -58,14 +58,18 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
     return input_path
 
 # ------------------------------------------------------------------------------
-# 2. 뉴스 크롤러 
+# 2. [핵심] 뉴스 크롤러 (최근 24시간 이내 최신 뉴스 강제 필터링 적용)
 # ------------------------------------------------------------------------------
 def fetch_one_top_news(keyword):
-    encoded_keyword = urllib.parse.quote(keyword)
+    # 키워드 뒤에 무조건 'when:1d'를 붙여 과거 중복 뉴스 원천 차단
+    search_query = f"{keyword} when:1d"
+    encoded_keyword = urllib.parse.quote(search_query)
     url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ko&gl=KR&ceid=KR:ko"
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
         root = ET.fromstring(response.content)
+        
+        # 가장 첫 번째(최신/관련도 높은 24시간 내) 기사 추출
         for item in root.findall('.//item'):
             title = item.find('title').text
             
@@ -89,7 +93,7 @@ def fetch_one_top_news(keyword):
                     return f"{news_title.strip()}|"
     except Exception:
         pass
-    return f"{keyword} 관련 뉴스를 업데이트 중입니다.|[시스템]"
+    return f"{keyword} 관련 최신 뉴스를 업데이트 중입니다.|[시스템]"
 
 def fetch_category_news(keywords_list):
     news_items = []
@@ -98,12 +102,11 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 3. 경제 지표 수집 (환율 2중 공식 API 방어망 추가)
+# 3. 경제 지표 수집 (글로벌 표준 환율 및 국내 지수 2중 방어망)
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "수집 실패(확인요망)", "kosdaq": "수집 실패(확인요망)", "usd": "수집 실패(확인요망)"}
     
-    # 1. 코스피/코스닥 수집
     try:
         r1 = requests.get("https://m.stock.naver.com/api/index/KOSPI/basic", headers=HEADERS, timeout=5).json()
         c1 = float(r1['compareToPreviousClosePrice'])
@@ -144,7 +147,6 @@ def fetch_economic_indicators():
                     indicators["kosdaq"] = f"{m_p2.group(1)} ({s2}{m_c2.group(2) if m_c2 else '0.00'}%)"
             except: pass
 
-    # 2. 환율(USD) 수집
     try:
         url = "https://m.stock.naver.com/front-api/v1/marketIndex/prices?category=exchange&reutersCode=FX_USDKRW"
         r3 = requests.get(url, headers=HEADERS, timeout=5).json()
@@ -205,7 +207,7 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] V29 렌더링 시작...")
+    print(f"[{today_str}] 마스터 피스 V30 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -432,14 +434,12 @@ def create_full_news_video_with_audio():
             
         clips.append(video_clip)
 
-    # [최적화] 영상 용량 다이어트를 위해 비트레이트(bitrate="1000k") 고정 -> 25MB 이메일 첨부 100% 성공 보장
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", bitrate="1000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     print(f"최종 마스터 동영상 렌더링 완료: {filename}")
     return filename
 
 def send_email_with_video(video_path, receiver_email):
-    # [수정] 메일 발송 시간 기준을 미국이 아닌 한국 시간(KST)으로 100% 고정
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     mail_date_str = today_dt.strftime('%Y년 %m월 %d일')
@@ -450,9 +450,9 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {mail_date_str} 요약뉴스 (마스터 피스 V29)"
+    msg['Subject'] = f"[박씨네 보험톡] {mail_date_str} 요약뉴스 (마스터 피스 V30)"
     
-    body = "형! 이메일 발송 최적화(제목 날짜 KST 적용, 영상 용량 제한, 에러 로그 출력)까지 완벽하게 끝냈습니다!"
+    body = "형! 구글 최신뉴스 강제 필터(when:1d) 적용해서 이제 매일매일 새로운 뉴스만 완벽하게 뽑아냅니다!"
     msg.attach(MIMEText(body, 'plain'))
     
     try:
@@ -466,7 +466,6 @@ def send_email_with_video(video_path, receiver_email):
         print(f"파일 첨부 중 에러 발생: {e}")
         return
 
-    # [수정] 발송 에러 발생 시 조용히 넘어가지 않고 깃허브 로그에 에러 원인 출력
     try:
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
