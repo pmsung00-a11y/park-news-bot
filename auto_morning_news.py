@@ -1,6 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 그랜드 마스터 에디션 (최종본)
-# (뉴스 9개 꽉 찬 배열, 우측 출처 정렬, 하단 문구 복구, 고급 명함 아웃트로)
+# 박씨네 보험톡 방송국 - 2배속 오디오 & 출처 완벽 우측 정렬 에디션
 # ==============================================================================
 
 import os
@@ -19,9 +18,10 @@ from email import encoders
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+import moviepy.audio.fx.all as afx
 
 # ------------------------------------------------------------------------------
-# 1. 뉴스 크롤러 (언론사 출처를 맨 뒤로 이동)
+# 1. 뉴스 크롤러 (언론사 이름을 완벽하게 추출하여 분리)
 # ------------------------------------------------------------------------------
 def fetch_one_top_news(keyword):
     encoded_keyword = urllib.parse.quote(keyword)
@@ -33,17 +33,31 @@ def fetch_one_top_news(keyword):
         root = ET.fromstring(xml_data)
         for item in root.findall('.//item'):
             title = item.find('title').text
+            
+            # [수정] 언론사 이름이 앞에 있든 뒤에 있든 완벽하게 분리하는 정규식
+            publisher = ""
+            news_title = title
+            
+            # 1. 뒤에 ' - 언론사명'이 있는 경우
             if ' - ' in title:
                 parts = title.rsplit(' - ', 1)
-                clean_title = f"{parts[0]} [{parts[1]}]"
-            else:
-                clean_title = title
-                
-            if len(clean_title) > 8:
-                return clean_title
+                news_title = parts[0]
+                publisher = parts[1]
+            # 2. 앞에 '[언론사명]'이 있는 경우
+            elif title.startswith('['):
+                match = re.match(r'^\[(.*?)\]\s*(.*)', title)
+                if match:
+                    publisher = match.group(1)
+                    news_title = match.group(2)
+                    
+            if len(news_title) > 8:
+                if publisher:
+                    return f"{news_title.strip()}|[{publisher.strip()}]"
+                else:
+                    return f"{news_title.strip()}|"
     except Exception:
         pass
-    return f"{keyword} 최신 뉴스를 업데이트 중입니다. [시스템]"
+    return f"{keyword} 뉴스를 업데이트 중입니다.|[시스템]"
 
 def fetch_category_news(keywords_list):
     news_items = []
@@ -52,7 +66,7 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 2. 경제 지표 수집 (해외 깃허브 차단 없는 야후 글로벌 API 우회 적용)
+# 2. 경제 지표 수집
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "수집 오류", "kosdaq": "수집 오류", "usd": "수집 오류"}
@@ -99,7 +113,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
     except Exception:
         return None
 
-# [핵심] 뉴스 9개 완벽 정렬 렌더링 (번호 부여, 자동 줄바꿈, 출처 우측 정렬)
+# [핵심] 뉴스 9개 완벽 정렬 (본문 먼저, 출처는 무조건 다음 줄 우측 끝!)
 import textwrap
 
 def draw_news_list(draw, items, font_num, font_main, font_pub, color, start_y):
@@ -107,30 +121,26 @@ def draw_news_list(draw, items, font_num, font_main, font_pub, color, start_y):
     for idx, item in enumerate(items, 1):
         num_str = f"{idx:02d}. "
         
-        # 제목과 출처 분리
-        match = re.search(r'^(.*?)(\s*\[.*?\])$', item)
-        if match:
-            title = match.group(1).strip()
-            pub = match.group(2).strip()
-        else:
-            title = item
-            pub = ""
+        # '|' 문자를 기준으로 본문과 출처 분리
+        parts = item.split('|')
+        title = parts[0]
+        pub = parts[1] if len(parts) > 1 else ""
             
         # 1. 번호 그리기
         draw.text((40, y), num_str, fill=color, font=font_num, anchor="la")
         text_x = 40 + draw.textlength(num_str, font=font_num)
         
-        # 2. 제목 내어쓰기(Hanging Indent) 그리기
-        wrapped = textwrap.wrap(title, 26) # 9개 꽉 차게 텍스트 너비 최적화
+        # 2. 제목 그리기 (자동 줄바꿈 및 내어쓰기)
+        wrapped = textwrap.wrap(title, 26) 
         for line in wrapped:
             draw.text((text_x, y), line, fill=(255, 255, 255, 255), font=font_main, anchor="la")
             y += 32 # 본문 줄 간격
             
-        # 3. 출처는 다음 줄 우측 끝으로 완벽 정렬
+        # 3. 출처는 무조건 '다음 줄'의 '우측 끝'으로 정렬
         if pub:
             pub_w = draw.textlength(pub, font=font_pub)
             draw.text((680 - pub_w, y), pub, fill=color, font=font_pub, anchor="la")
-            y += 38 # 다음 뉴스와의 넉넉한 간격
+            y += 38 # 다음 뉴스와의 간격
         else:
             y += 20
             
@@ -143,7 +153,7 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 그랜드 마스터 에디션 렌더링 시작...")
+    print(f"[{today_str}] 2배속 & 우측정렬 에디션 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -162,7 +172,6 @@ def create_full_news_video_with_audio():
 
     eco_data = fetch_economic_indicators()
 
-    # 9개 꽉 찬 뉴스 키워드
     health_news = fetch_category_news(["건강보험공단", "실손보험", "요양병원", "보건복지부", "비급여 진료", "국민연금", "암보험", "의료 정책", "건강 팁"])
     econ_news = fetch_category_news(["서울 아파트값", "전세 대출", "한국은행 금리", "부동산 PF", "신규 분양", "청약 경쟁률", "부동산 정책", "재건축", "월세 동향"])
     finance_news = fetch_category_news(["국내 증시 KOSPI", "미국 증시 나스닥", "원달러 환율", "퇴직연금", "가상화폐 비트코인", "금값", "배당금", "개미 투자자", "금융 당국"])
@@ -170,7 +179,7 @@ def create_full_news_video_with_audio():
     tip_news = fetch_category_news(["연말정산 팁", "정부 지원금", "소상공인 혜택", "알뜰폰", "절세 방법", "청년 지원", "할인 혜택", "대중교통비", "카드 혜택"])
 
     def make_short_script(intro, news_list):
-        first_news = re.sub(r'\s*\[.*?\]', '', news_list[0]) 
+        first_news = news_list[0].split('|')[0]
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {first_news} 입니다. 그 외 화면의 주요 소식들도 함께 확인해 보십시오."
 
     news_database = [
@@ -183,7 +192,7 @@ def create_full_news_video_with_audio():
 
     slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은 {today_str}입니다."}]
     for i, cat in enumerate(news_database, start=1):
-        slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg_keyword": cat["bg_keyword"], "subtitle": f"오늘의 핵심 뉴스 ({i}/5)", "items": cat["items"], "script": cat["script"]})
+        slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg_keyword": cat["bg_keyword"], "items": cat["items"], "script": cat["script"]})
     slides_data.append({"type": "outro", "script": "보험이 궁금할 땐 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 응원합니다."})
 
     clips = []
@@ -235,10 +244,9 @@ def create_full_news_video_with_audio():
             
             draw_ov.rounded_rectangle([25, 200, img_width - 25, 1160], fill=(0, 0, 0, 200), outline=data["accent"]+(150,), width=2, radius=15)
             
-            # [핵심] 뉴스 9개 그리기 함수 호출
+            # [핵심] 뉴스 9개 + 우측 정렬 그리기 함수 호출
             draw_news_list(draw_ov, data['items'][:9], font_num, font_body, font_pub, data["accent"]+(255,), 230)
             
-            # [형이 원했던 하단 문구 완벽 부활!]
             draw_ov.rounded_rectangle([40, 1180, img_width - 40, 1240], fill=(0, 0, 0, 230), outline=(80, 90, 110, 255), width=1, radius=10)
             draw_ov.text((img_width//2, 1210), "구독과 좋아요는 큰 힘이 됩니다 - 박씨네 보험톡", fill=(200, 210, 220, 255), font=font_small, anchor="mm")
             
@@ -252,28 +260,21 @@ def create_full_news_video_with_audio():
             draw_ov.text((img_width//2, 520), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
             draw_ov.text((img_width//2, 600), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
             
-            # 고급 명함 아웃트로 박스 (이모티콘 깨짐 방지를 위해 세련된 영문 텍스트 뱃지 적용)
             box_w = 480
             box_x = (img_width - box_w) // 2
             draw_ov.rounded_rectangle([box_x, 700, box_x + box_w, 920], fill=(30, 35, 45, 240), outline=(100, 110, 130, 255), width=2, radius=15)
             
             info_start_y = 740
-            badge_x = box_x + 40
-            text_x = badge_x + 60
+            text_x = box_x + 90
             
-            # 전화번호
-            draw_ov.rounded_rectangle([badge_x, info_start_y, badge_x+45, info_start_y+24], fill=(241, 196, 15, 255), radius=5)
-            draw_ov.text((badge_x + 22, info_start_y + 12), "TEL", fill=(0,0,0,255), font=font_small, anchor="mm")
+            # [수정] 이모티콘 텍스트 적용 (전화기, 말풍선, 지구본)
+            draw_ov.text((box_x + 40, info_start_y - 8), "☎", fill=(241, 196, 15, 255), font=font_num, anchor="la")
             draw_ov.text((text_x, info_start_y - 4), "010-2062-4600", fill=(255, 255, 255, 255), font=font_num, anchor="la")
             
-            # 카카오톡
-            draw_ov.rounded_rectangle([badge_x, info_start_y+65, badge_x+45, info_start_y+89], fill=(46, 204, 113, 255), radius=5)
-            draw_ov.text((badge_x + 22, info_start_y + 65 + 12), "TALK", fill=(0,0,0,255), font=font_small, anchor="mm")
+            draw_ov.text((box_x + 40, info_start_y+65 - 8), "💬", fill=(46, 204, 113, 255), font=font_num, anchor="la")
             draw_ov.text((text_x, info_start_y+65 - 4), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_num, anchor="la")
             
-            # 블로그
-            draw_ov.rounded_rectangle([badge_x, info_start_y+130, badge_x+45, info_start_y+154], fill=(52, 152, 219, 255), radius=5)
-            draw_ov.text((badge_x + 22, info_start_y + 130 + 12), "WEB", fill=(0,0,0,255), font=font_small, anchor="mm")
+            draw_ov.text((box_x + 40, info_start_y+130 - 8), "🌐", fill=(52, 152, 219, 255), font=font_num, anchor="la")
             draw_ov.text((text_x, info_start_y+130), "blog.naver.com/insureeasy", fill=(180, 200, 230, 255), font=font_pub, anchor="la")
             
             draw_ov.text((img_width//2, 1100), "오늘도 행복한 하루 보내세요!", fill=(180, 200, 230, 255), font=font_pub, anchor="mm")
@@ -286,12 +287,18 @@ def create_full_news_video_with_audio():
         try:
             tts = gTTS(text=data["script"], lang="ko")
             tts.save(audio_path)
-            audio_clip = AudioFileClip(audio_path)
-            actual_duration = audio_clip.duration + 2.5
+            
+            # [핵심] 오디오 속도 2배속(2.0x) 강제 적용!
+            original_audio = AudioFileClip(audio_path)
+            fast_audio = original_audio.fx(afx.speedx, 2.0)
+            
+            # 오디오 길이에 맞춰 화면 유지 시간도 반으로 팍 줄어듦
+            actual_duration = fast_audio.duration + 2.0
             img_clip = ImageClip(img_path).set_duration(actual_duration)
-            video_clip = img_clip.set_audio(audio_clip)
-        except Exception:
-            video_clip = ImageClip(img_path).set_duration(8.0)
+            video_clip = img_clip.set_audio(fast_audio)
+        except Exception as e:
+            print(f"오디오 변환 오류: {e}")
+            video_clip = ImageClip(img_path).set_duration(6.0)
             
         clips.append(video_clip)
 
@@ -307,9 +314,9 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (최종 마스터 에디션)"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (2배속 초스피드본)"
     
-    body = "형! 하단 문구까지 완벽하게 부활한 진짜 최종 마스터본이야! 수고 많았어!"
+    body = "형! 이제 말하는 속도도 2배로 빨라지고, 언론사 이름도 전부 우측에 예쁘게 정렬됐어! 확인해봐!"
     msg.attach(MIMEText(body, 'plain'))
     
     try:
