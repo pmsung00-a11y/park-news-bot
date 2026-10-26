@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 그랜드 마스터 에디션 (V4)
+# 박씨네 보험톡 방송국 - 그랜드 마스터 에디션 (V4 최종)
 # (FFmpeg 2배속, 8개 꽉찬 정렬, 우측 출처 정렬, 수제작 아이콘 아웃트로)
 # ==============================================================================
 
@@ -333,4 +333,43 @@ def create_full_news_video_with_audio():
             print(f"오디오 예외: {e}")
             video_clip = ImageClip(img_path).set_duration(6.0)
             
-        clips.
+        clips.append(video_clip)
+
+    final_video = concatenate_videoclips(clips, method="compose")
+    final_video.write_videofile(filename, fps=24, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    print(f"최종 마스터 동영상 렌더링 완료: {filename}")
+    return filename
+
+def send_email_with_video(video_path, receiver_email):
+    sender_email = "pmsung00@gmail.com"  
+    sender_password = "efumyhjmxxugdfaw"  
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (그랜드 마스터)"
+    
+    body = "형! 오디오 2배속 초스피드, 표지 지표, 뉴스 8선 우측 정렬까지 전부 완벽하게 성공했어!"
+    msg.attach(MIMEText(body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
+        msg.attach(part)
+    except: pass
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+    except: pass
+
+if __name__ == "__main__":
+    video_file = create_full_news_video_with_audio()
+    send_email_with_video(video_file, "pmsung00@gmail.com")
+# --- END OF CODE (이 줄이 보이면 정상적으로 전체 복사된 것입니다) ---
