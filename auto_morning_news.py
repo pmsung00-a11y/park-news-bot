@@ -1,6 +1,6 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 얼티밋 마스터 V12 (최종 완성본)
-# (네이버 모바일 검색 우회, 화이트 힐링 박스, 윙크 이모티콘, 자동 핏팅)
+# 박씨네 보험톡 방송국 - 얼티밋 마스터 V12.1 (최종 버그 수정본)
+# (font_small 누락 에러 해결, 힐링 화이트 박스, 윙크 이모티콘 100% 적용)
 # ==============================================================================
 
 import os
@@ -27,7 +27,7 @@ HEADERS = {
 }
 
 # ------------------------------------------------------------------------------
-# 1. FFmpeg 1.5배속 쾌속 엔진 (에러율 0%)
+# 1. FFmpeg 1.5배속 쾌속 엔진
 # ------------------------------------------------------------------------------
 def speedup_audio_ffmpeg(input_path, output_path, speed=1.5):
     cmd = ['ffmpeg', '-y', '-i', input_path, '-filter:a', f'atempo={speed}', output_path]
@@ -80,7 +80,7 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 3. 경제 지표 수집 (네이버 모바일 통합검색 HTML 직접 크롤링 - 차단 방어 100%)
+# 3. 경제 지표 수집 (네이버 모바일 통합검색 HTML 직접 크롤링)
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "2,583.27 (▲0.09%)", "kosdaq": "727.41 (▼0.98%)", "usd": "1,390.50원"}
@@ -145,11 +145,12 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 얼티밋 마스터 V12 렌더링 시작...")
+    print(f"[{today_str}] 얼티밋 마스터 V12.1 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
     
+    # [버그 수정] font_small 누락 해결 완료
     try:
         font_huge = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 65)
         font_large = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 40)
@@ -158,8 +159,9 @@ def create_full_news_video_with_audio():
         font_num = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 26) 
         font_main = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 24) 
         font_pub = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 20)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 14) 
     except:
-        font_huge = font_large = font_title = font_num = font_main = font_pub = ImageFont.load_default()
+        font_huge = font_large = font_title = font_num = font_main = font_pub = font_small = ImageFont.load_default()
 
     eco_data = fetch_economic_indicators()
 
@@ -173,7 +175,6 @@ def create_full_news_video_with_audio():
         first_news = news_list[0].split('|')[0]
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {first_news} 입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
 
-    # 형이 원했던 "각 주제별 따뜻하고 예쁜 힐링 문구 (윙크 심볼 추가!)"
     news_database = [
         {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요! 😉", "script": make_short_script("건강 보험 소식입니다.", health_news)},
         {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요! 😉", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
@@ -277,7 +278,6 @@ def create_full_news_video_with_audio():
                 draw_ov.text((45, current_y), num_str, fill=data["accent"]+(255,), font=font_num, anchor="la")
                 text_x = 45 + draw_ov.textlength(num_str, font=font_num)
                 
-                # [개선 3] 뉴스 본문 색상 교차 (홀수: 화이트, 짝수: 밝은 초록색 고정 적용)
                 text_color = (255, 255, 255, 255) if idx % 2 != 0 else (180, 250, 180, 255)
                 
                 for line in item["title"]:
@@ -291,16 +291,12 @@ def create_full_news_video_with_audio():
                     
                 current_y += gap_per_item
             
-            # [개선 2 & 4] 하단 화이트 힐링 문구 박스 (글자 길이에 맞게 정중앙 크기 자동 핏팅 + 윙크 이모티콘)
             footer_y = box_bottom + 20
             footer_w = draw_ov.textlength(data["footer"], font=font_num)
             f_box_w = footer_w + 60
             f_box_x = (img_width - f_box_w) / 2
             
-            # 순백색(White) 바탕에 해당 주제의 테두리 컬러 적용
             draw_ov.rounded_rectangle([f_box_x, footer_y, f_box_x + f_box_w, footer_y + 50], fill=(255, 255, 255, 255), outline=data["accent"]+(255,), width=2, radius=15)
-            
-            # 진한 검정색(Black) 글씨체로 강조
             draw_ov.text((img_width//2, footer_y + 25), data["footer"], fill=(0, 0, 0, 255), font=font_num, anchor="mm")
             
         elif data["type"] == "outro":
@@ -320,21 +316,18 @@ def create_full_news_video_with_audio():
             info_start_y = 735
             text_x = box_x + 80
             
-            # 수제작 전화기 로고
             ix, iy = box_x + 35, info_start_y
             draw_ov.rounded_rectangle([ix, iy, ix+24, iy+38], radius=4, fill=(241, 196, 15, 255))
             draw_ov.rectangle([ix+3, iy+4, ix+21, iy+30], fill=(30, 35, 45, 255))
             draw_ov.ellipse([ix+10, iy+33, ix+14, iy+35], fill=(255, 255, 255, 255))
             draw_ov.text((text_x, iy + 6), "010-2062-4600", fill=(255, 255, 255, 255), font=font_num, anchor="la")
             
-            # 수제작 카카오톡 로고
             iy += 65
             draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
             draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
-            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
+            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm") # 여기에 font_small이 쓰입니다!
             draw_ov.text((text_x, iy + 6), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_num, anchor="la")
             
-            # 수제작 지구본 로고
             iy += 65
             draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
             draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
@@ -380,9 +373,9 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (그랜드 마스터 V12)"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (얼티밋 마스터 V12.1)"
     
-    body = "형! 경제지표 복구, 하단 화이트 힐링 문구, 이모티콘까지 모조리 완벽하게 100번 검증 마친 본이야!"
+    body = "형! font_small 누락 에러 해결하고 힐링 화이트 박스까지 싹 다 적용된 최종본이야!"
     msg.attach(MIMEText(body, 'plain'))
     
     try:
