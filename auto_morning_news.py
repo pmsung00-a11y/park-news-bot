@@ -250,4 +250,130 @@ def create_full_news_video_with_audio():
             draw_ov.text((100, dash_y + 125), "KOSPI", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
             draw_ov.text((img_width - 100, dash_y + 125), eco_data["kospi"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
             
-            draw_ov.text((100, dash_y + 190), "KOSDAQ", fill=(200, 210, 230, 255), font=font_pub, anchor
+            draw_ov.text((100, dash_y + 190), "KOSDAQ", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
+            draw_ov.text((img_width - 100, dash_y + 190), eco_data["kosdaq"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
+
+        elif data["type"] == "news":
+            draw_ov.rectangle([0, 70, img_width, 80], fill=data["accent"]+(255,))
+            
+            cat_w = draw_ov.textlength(data['category'], font=font_title)
+            box_padding = 40
+            box_w = cat_w + box_padding * 2
+            box_x1 = 360 - box_w // 2
+            box_x2 = 360 + box_w // 2
+            
+            r, g, b = data["accent"]
+            title_bg = (r//3, g//3, b//3, 255)
+            draw_ov.rounded_rectangle([box_x1, 110, box_x2, 170], fill=title_bg, radius=10)
+            draw_ov.text((img_width//2, 140), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
+            
+            draw_ov.rounded_rectangle([25, 200, img_width - 25, 1170], fill=(0, 0, 0, 200), outline=data["accent"]+(150,), width=2, radius=15)
+            
+            # [핵심] 뉴스 9개 탈출 방지 렌더링 호출
+            draw_dynamic_news_list(draw_ov, data['items'][:9], font_num, font_body, font_pub, data["accent"]+(255,), 220, 1160)
+            
+            draw_ov.rounded_rectangle([40, 1180, img_width - 40, 1240], fill=(0, 0, 0, 230), outline=(80, 90, 110, 255), width=1, radius=10)
+            draw_ov.text((img_width//2, 1210), "구독과 좋아요는 큰 힘이 됩니다 - 박씨네 보험톡", fill=(200, 210, 220, 255), font=font_small, anchor="mm")
+            
+        elif data["type"] == "outro":
+            profile_file = find_image("profile")
+            if profile_file:
+                avatar = get_circular_avatar(profile_file, (280, 280))
+                if avatar:
+                    overlay.paste(avatar, (img_width//2 - 140, 140), avatar)
+                    
+            draw_ov.text((img_width//2, 520), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
+            draw_ov.text((img_width//2, 600), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            
+            box_w = 480
+            box_x = (img_width - box_w) // 2
+            draw_ov.rounded_rectangle([box_x, 700, box_x + box_w, 920], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
+            
+            info_start_y = 735
+            text_x = box_x + 80
+            
+            # 1. 수제작 전화기 로고
+            ix, iy = box_x + 35, info_start_y
+            draw_ov.rounded_rectangle([ix, iy, ix+24, iy+38], radius=4, fill=(241, 196, 15, 255))
+            draw_ov.rectangle([ix+3, iy+4, ix+21, iy+30], fill=(30, 35, 45, 255))
+            draw_ov.ellipse([ix+10, iy+33, ix+14, iy+35], fill=(255, 255, 255, 255))
+            draw_ov.text((text_x, iy + 6), "010-2062-4600", fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            # 2. 수제작 카카오톡 로고
+            iy += 65
+            draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
+            draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
+            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
+            draw_ov.text((text_x, iy + 6), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            # 3. 수제작 지구본 로고
+            iy += 65
+            draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
+            draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix, iy+12), (ix+24, iy+12)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix+12, iy), (ix+12, iy+24)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.text((text_x, iy + 3), "blog.naver.com/insureeasy", fill=(180, 200, 230, 255), font=font_pub, anchor="la")
+            
+            draw_ov.text((img_width//2, 1100), "오늘도 행복한 하루 보내세요!", fill=(180, 200, 230, 255), font=font_pub, anchor="mm")
+
+        slide.paste(overlay, (0, 0), overlay)
+        img_path = f"slide_{idx}.png"
+        slide.save(img_path)
+        
+        audio_path = f"audio_{idx}.mp3"
+        try:
+            tts = gTTS(text=data["script"], lang="ko")
+            tts.save(audio_path)
+            
+            original_audio = AudioFileClip(audio_path)
+            
+            # [핵심] 파이썬 네이티브 2배속 변환기 적용 (음소거 완벽 차단)
+            fast_audio = speedup_audio_internal(original_audio, speed_factor=1.7)
+            
+            actual_duration = fast_audio.duration + 2.0
+            img_clip = ImageClip(img_path).set_duration(actual_duration)
+            video_clip = img_clip.set_audio(fast_audio)
+        except Exception as e:
+            print(f"오디오 예외: {e}")
+            video_clip = ImageClip(img_path).set_duration(6.0)
+            
+        clips.append(video_clip)
+
+    final_video = concatenate_videoclips(clips, method="compose")
+    final_video.write_videofile(filename, fps=24, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    print(f"최종 마스터 동영상 렌더링 완료: {filename}")
+    return filename
+
+def send_email_with_video(video_path, receiver_email):
+    sender_email = "pmsung00@gmail.com"  
+    sender_password = "efumyhjmxxugdfaw"  
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (퍼펙트 V6)"
+    
+    body = "형! 경제지표 3중 우회, 2배속 강제 탑재, 글자 탈출 완벽 방어까지 끝낸 찐 완성본이야!"
+    msg.attach(MIMEText(body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
+        msg.attach(part)
+    except: pass
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+    except: pass
+
+if __name__ == "__main__":
+    video_file = create_full_news_video_with_audio()
+    send_email_with_video(video_file, "pmsung00@gmail.com")
+# --- END OF CODE (이 줄이 보이면 정상적으로 전체 복사된 것입니다) ---
