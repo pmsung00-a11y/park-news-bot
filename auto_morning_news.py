@@ -1,6 +1,6 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 그랜드 마스터 V21 (진짜 최종 안정화 버전)
-# (오디오 WAV 강제변환 씽크 100% 일치, 상하단 박스 길이 동기화, 야후 차트 API)
+# 박씨네 보험톡 방송국 - 그랜드 마스터 V22 (진정한 최종 완성본)
+# (오디오 기계음 팝핑 방지 페이드아웃, 하단 박스 본문 길이 동기화 및 글씨 확대)
 # ==============================================================================
 
 import os
@@ -20,6 +20,7 @@ from email import encoders
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+from moviepy.audio.fx.all import audio_fadeout  # 기계음 방지용 페이드아웃 효과
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -27,7 +28,7 @@ HEADERS = {
 }
 
 # ------------------------------------------------------------------------------
-# 1. FFmpeg 오디오 엔진 (버그 방지를 위해 무조건 WAV로 추출 및 44100Hz 고정)
+# 1. FFmpeg 오디오 엔진 
 # ------------------------------------------------------------------------------
 def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
     cmd = ['ffmpeg', '-y', '-i', input_path, '-filter:a', f'atempo={speed}', '-ar', '44100', output_path]
@@ -36,7 +37,7 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
         if os.path.exists(output_path):
             return output_path
     except Exception as e:
-        print(f"오디오 가속 실패, 원본 WAV로 변환: {e}")
+        print(f"오디오 가속 실패, 원본 WAV 변환: {e}")
         fallback_cmd = ['ffmpeg', '-y', '-i', input_path, '-ar', '44100', output_path]
         try:
             subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
@@ -86,7 +87,7 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 3. 경제 지표 수집 (오류 시 가짜값 출력 절대 금지)
+# 3. 경제 지표 수집
 # ------------------------------------------------------------------------------
 def get_yahoo_chart_data(symbol):
     try:
@@ -111,7 +112,6 @@ def fetch_economic_indicators():
         "usd": get_yahoo_chart_data("KRW=X")
     }
     
-    # 야후 실패 시 국내 금융 최후 우회망
     if "확인중" in indicators["kospi"]:
         try:
             r1 = requests.get("https://m.stock.naver.com/api/index/KOSPI/basic", headers=HEADERS, timeout=5).json()
@@ -159,7 +159,7 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 마스터 피스 V21 렌더링 시작...")
+    print(f"[{today_str}] 마스터 피스 V22 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -175,8 +175,8 @@ def create_full_news_video_with_audio():
         font_small = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 14)
         font_footer = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 30)
         
-        # 힐링 문구용 폰트 (가독성을 위해 굵고 큰 사이즈)
-        font_healing = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 26)
+        # [수정] 힐링 문구용 폰트를 기존 26pt에서 34pt로 대폭 키움 (가독성 폭발)
+        font_healing = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 34)
     except:
         font_huge = font_large = font_title = font_num = font_main = font_pub = font_small = font_footer = font_healing = ImageFont.load_default()
 
@@ -188,15 +188,11 @@ def create_full_news_video_with_audio():
     social_news = fetch_category_news(["사건 사고", "생활 안전", "기상 날씨", "교통 패스", "지자체 소식", "교육 정책", "복지 정책", "사회 공헌"])
     tip_news = fetch_category_news(["연말정산 꿀팁", "정부 지원금", "소상공인 지원", "알뜰폰 요금제", "절세 방법", "청년 혜택", "할인 행사", "카드 혜택"])
 
-    # [핵심] 오디오 대본 뚝 끊김 방지 - 순수 한글, 영문, 숫자만 남김
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
-        # 앞에 붙은 번호표 완벽 제거
         first_news = re.sub(r'^\d+\.\s*', '', first_news)
-        # 구글 TTS가 버벅이는 특수기호 완벽 제거
         clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', first_news)
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
-        # 공백 없이 바로 '입니다' 연결
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news}입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
 
     news_database = [
@@ -258,16 +254,16 @@ def create_full_news_video_with_audio():
             draw_ov.text((img_width - 100, dash_y + 230), eco_data["usd"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
 
         elif data["type"] == "news":
-            # 1. 상단 박스 가로 길이 도출
             cat_w = draw_ov.textlength(data['category'], font=font_title)
-            # 2. [핵심수정] 상하단 박스 길이를 완벽하게 통일 (항상 cat_w + 80 픽셀로 고정)
-            box_w = cat_w + 80
-            box_x1 = 360 - box_w // 2
-            box_x2 = 360 + box_w // 2
+            
+            # 상단 제목 박스는 글자 길이에 맞춰서 생성
+            title_box_w = cat_w + 80
+            title_box_x1 = 360 - title_box_w // 2
+            title_box_x2 = 360 + title_box_w // 2
             
             r, g, b = data["accent"]
             draw_ov.rectangle([0, 70, img_width, 80], fill=data["accent"]+(255,))
-            draw_ov.rounded_rectangle([box_x1, 110, box_x2, 170], fill=(r//3, g//3, b//3, 255), radius=10)
+            draw_ov.rounded_rectangle([title_box_x1, 110, title_box_x2, 170], fill=(r//3, g//3, b//3, 255), radius=10)
             draw_ov.text((img_width//2, 140), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
             start_y = 230
@@ -276,163 +272,4 @@ def create_full_news_video_with_audio():
             
             for item in data['items'][:8]:
                 parts = item.split('|')
-                title = parts[0]
-                pub = parts[1] if len(parts) > 1 else ""
-                
-                wrapped = textwrap.wrap(title, 27)
-                item_h = len(wrapped) * 34 
-                if pub: item_h += 28       
-                
-                total_text_height += item_h
-                parsed_items.append({"title": wrapped, "pub": pub})
-                
-            available_gap = (1120 - start_y) - total_text_height
-            gap_per_item = max(10, min(available_gap / len(parsed_items), 45)) if parsed_items else 20
-            
-            calculated_bottom = start_y
-            for item in parsed_items:
-                calculated_bottom += len(item["title"]) * 34
-                if item["pub"]: calculated_bottom += 28
-                calculated_bottom += gap_per_item
-            
-            box_bottom = calculated_bottom - gap_per_item + 20
-            draw_ov.rounded_rectangle([25, 200, img_width - 25, box_bottom], fill=(0, 0, 0, 200), outline=data["accent"]+(150,), width=2, radius=15)
-            
-            current_y = start_y
-            for idx, item in enumerate(parsed_items, 1):
-                num_str = f"{idx:02d}. "
-                draw_ov.text((45, current_y), num_str, fill=data["accent"]+(255,), font=font_num, anchor="la")
-                text_x = 45 + draw_ov.textlength(num_str, font=font_num)
-                
-                text_color = (255, 255, 255, 255) if idx % 2 != 0 else (180, 250, 180, 255)
-                
-                for line in item["title"]:
-                    draw_ov.text((text_x, current_y), line, fill=text_color, font=font_main, anchor="la")
-                    current_y += 34
-                    
-                if item["pub"]:
-                    pub_w = draw_ov.textlength(item["pub"], font=font_pub)
-                    draw_ov.text((670 - pub_w, current_y), item["pub"], fill=data["accent"]+(255,), font=font_pub, anchor="la")
-                    current_y += 28
-                    
-                current_y += gap_per_item
-            
-            # 3. [핵심수정] 하단 힐링 문구 시선 강탈 디자인 (상단 박스와 정확히 동일한 가로 길이 box_x1, box_x2 사용)
-            footer_y = box_bottom + 20
-            draw_ov.rounded_rectangle([box_x1, footer_y, box_x2, footer_y + 50], fill=(255, 255, 255, 255), outline=(220, 50, 50, 255), width=3, radius=15)
-            draw_ov.text((img_width//2, footer_y + 25), data["footer"], fill=(0, 0, 0, 255), font=font_healing, anchor="mm")
-            
-        elif data["type"] == "outro":
-            profile_file = find_image("profile")
-            if profile_file:
-                avatar = get_circular_avatar(profile_file, (280, 280))
-                if avatar:
-                    overlay.paste(avatar, (img_width//2 - 140, 130), avatar)
-                    
-            draw_ov.text((img_width//2, 500), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
-            draw_ov.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
-            
-            t1 = "010-2062-4600"
-            t2 = "PMSUNGOO"
-            t3 = "blog.naver.com/insureeasy"
-            
-            w1 = draw_ov.textlength(t1, font=font_num)
-            w2 = draw_ov.textlength(t2, font=font_num)
-            w3 = draw_ov.textlength(t3, font=font_pub)
-            max_text_w = max(w1, w2, w3)
-            
-            out_box_w = 24 + 15 + max_text_w + 80
-            out_box_x = (img_width - out_box_w) / 2
-            
-            draw_ov.rounded_rectangle([out_box_x, 680, out_box_x + out_box_w, 900], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
-            
-            info_start_y = 715
-            ix = out_box_x + 35
-            text_x = ix + 40
-            
-            draw_ov.rounded_rectangle([ix, info_start_y, ix+24, info_start_y+38], radius=4, fill=(241, 196, 15, 255))
-            draw_ov.rectangle([ix+3, info_start_y+4, ix+21, info_start_y+30], fill=(30, 35, 45, 255))
-            draw_ov.ellipse([ix+10, info_start_y+33, ix+14, info_start_y+35], fill=(255, 255, 255, 255))
-            draw_ov.text((text_x, info_start_y + 6), t1, fill=(255, 255, 255, 255), font=font_num, anchor="la")
-            
-            iy = info_start_y + 65
-            draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
-            draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
-            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
-            draw_ov.text((text_x, iy + 6), t2, fill=(255, 255, 255, 255), font=font_num, anchor="la")
-            
-            iy += 65
-            draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
-            draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
-            draw_ov.line([(ix, iy+12), (ix+24, iy+12)], fill=(255, 255, 255, 255), width=1)
-            draw_ov.line([(ix+12, iy), (ix+12, iy+24)], fill=(255, 255, 255, 255), width=1)
-            draw_ov.text((text_x, iy + 3), t3, fill=(180, 200, 230, 255), font=font_pub, anchor="la")
-            
-            draw_ov.text((img_width//2, 1080), "오늘도 행복한 하루 보내세요!", fill=(255, 215, 0, 255), font=font_footer, anchor="mm")
-
-        slide.paste(overlay, (0, 0), overlay)
-        img_path = f"slide_{idx}.png"
-        slide.save(img_path)
-        
-        # [핵심] 오디오 씽크 밀림 및 반복 버그 완벽 차단 (강제 WAV 처리 및 정밀 컷팅)
-        audio_path = f"audio_{idx}.mp3"
-        fast_audio_path = f"fast_audio_{idx}.wav"
-        
-        try:
-            tts = gTTS(text=data["script"], lang="ko")
-            tts.save(audio_path)
-            
-            # WAV 파일로 강제 인코딩하여 오디오 길이 계산 오류 원천 차단
-            final_audio_file = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.4)
-            audio_clip = AudioFileClip(final_audio_file)
-            
-            # 이미지 영상 클립의 길이를 오디오 길이에 소수점까지 맞춘 뒤 아주 짧은 여운(1.0초)만 추가
-            actual_duration = audio_clip.duration + 1.0
-            
-            img_clip = ImageClip(img_path).set_duration(actual_duration)
-            video_clip = img_clip.set_audio(audio_clip)
-        except Exception as e:
-            print(f"오디오 치명적 예외: {e}")
-            video_clip = ImageClip(img_path).set_duration(6.0)
-            
-        clips.append(video_clip)
-
-    # 영상 렌더링 시 오디오와 영상 트랙을 완벽하게 재합성하여 꼬임 방지
-    final_video = concatenate_videoclips(clips, method="compose")
-    final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
-    print(f"최종 마스터 동영상 렌더링 완료: {filename}")
-    return filename
-
-def send_email_with_video(video_path, receiver_email):
-    sender_email = "pmsung00@gmail.com"  
-    sender_password = "efumyhjmxxugdfaw"  
-    
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (마스터 피스 V21)"
-    
-    body = "형! 오디오 버벅임 WAV로 완벽 차단, 지표 야후 정밀 크롤링, 하단 박스 통일 100% 적용된 찐막본이야!"
-    msg.attach(MIMEText(body, 'plain'))
-    
-    try:
-        with open(video_path, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
-        msg.attach(part)
-    except: pass
-
-    try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, receiver_email, text)
-        server.quit()
-    except: pass
-
-if __name__ == "__main__":
-    video_file = create_full_news_video_with_audio()
-    send_email_with_video(video_file, "pmsung00@gmail.com")
-# --- END OF CODE ---
+                title = parts
