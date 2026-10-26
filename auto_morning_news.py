@@ -1,6 +1,6 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 얼티밋 마스터 V12.1 (최종 버그 수정본)
-# (font_small 누락 에러 해결, 힐링 화이트 박스, 윙크 이모티콘 100% 적용)
+# 박씨네 보험톡 방송국 - 퍼펙트 마스터 V13 (최종 완성본)
+# (오디오 대본 특수문자 정제, 야후 전일종가 고정, 아웃트로 박스 핏팅 & 옐로우 강조)
 # ==============================================================================
 
 import os
@@ -22,7 +22,7 @@ from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
 }
 
@@ -80,10 +80,32 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 3. 경제 지표 수집 (네이버 모바일 통합검색 HTML 직접 크롤링)
+# 3. 경제 지표 수집 (야후 파이낸스 '어제 종가' 고정 타겟팅)
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "2,583.27 (▲0.09%)", "kosdaq": "727.41 (▼0.98%)", "usd": "1,390.50원"}
+    
+    # 아침 뉴스 브리핑 특성상, 장 시작 전이므로 '전일 마감 종가'를 정확히 가져옵니다.
+    try:
+        url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=^KS11,^KQ11,KRW=X"
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            for res_data in data['quoteResponse']['result']:
+                sym = res_data['symbol']
+                # regularMarketPrice는 새벽/아침 시간대에는 전일 종가와 동일하게 유지됨
+                price = res_data.get('regularMarketPrice', 0)
+                change = res_data.get('regularMarketChangePercent', 0)
+                sign = "▲" if change > 0 else "▼" if change < 0 else "-"
+                
+                if sym == "^KS11": indicators["kospi"] = f"{price:,.2f} ({sign}{abs(change):.2f}%)"
+                elif sym == "^KQ11": indicators["kosdaq"] = f"{price:,.2f} ({sign}{abs(change):.2f}%)"
+                elif sym == "KRW=X": indicators["usd"] = f"{price:,.2f}원"
+            return indicators
+    except Exception as e:
+        print(f"야후 금융 지표 가져오기 실패: {e}")
+
+    # 야후가 막혔을 경우 대비 네이버 모바일 통합검색 (우회 방어)
     try:
         q_kospi = urllib.parse.quote("코스피지수")
         res1 = requests.get(f"https://m.search.naver.com/search.naver?query={q_kospi}", headers=HEADERS, timeout=5).text
@@ -110,9 +132,8 @@ def fetch_economic_indicators():
         m_p3 = re.search(r'<strong>([\d,.]+)</strong>', res3)
         if m_p3:
             indicators["usd"] = f"{m_p3.group(1)}원"
-            
-    except Exception as e:
-        print(f"경제지표 검색 실패: {e}")
+    except Exception:
+        pass
         
     return indicators
 
@@ -145,12 +166,11 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 얼티밋 마스터 V12.1 렌더링 시작...")
+    print(f"[{today_str}] 얼티밋 마스터 V13 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
     
-    # [버그 수정] font_small 누락 해결 완료
     try:
         font_huge = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 65)
         font_large = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 40)
@@ -159,9 +179,12 @@ def create_full_news_video_with_audio():
         font_num = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 26) 
         font_main = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 24) 
         font_pub = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 20)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 14) 
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 14)
+        
+        # 마지막장 하단 문구용 거대한 노란색 폰트
+        font_footer = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 30)
     except:
-        font_huge = font_large = font_title = font_num = font_main = font_pub = font_small = ImageFont.load_default()
+        font_huge = font_large = font_title = font_num = font_main = font_pub = font_small = font_footer = ImageFont.load_default()
 
     eco_data = fetch_economic_indicators()
 
@@ -171,16 +194,20 @@ def create_full_news_video_with_audio():
     social_news = fetch_category_news(["사건 사고", "생활 안전", "기상 날씨", "교통 패스", "지자체 소식", "교육 정책", "복지 정책", "사회 공헌"])
     tip_news = fetch_category_news(["연말정산 꿀팁", "정부 지원금", "소상공인 지원", "알뜰폰 요금제", "절세 방법", "청년 혜택", "할인 행사", "카드 혜택"])
 
+    # [수정] 오디오 오류를 막기 위해 특수문자 완벽 제거 정제 로직 적용
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
-        return f"{intro} 오늘 주목할 첫 번째 뉴스는 {first_news} 입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
+        # 점 3개(...), 대괄호, 특수기호 싹 지워서 오디오 꼬임 방지
+        clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s,.]', '', first_news).replace('...', ' ').strip()
+        return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news} 입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
 
+    # [수정] 이모티콘 제거하고 문구를 깔끔하게 정제 (가독성 높은 화이트 박스용)
     news_database = [
-        {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요! 😉", "script": make_short_script("건강 보험 소식입니다.", health_news)},
-        {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요! 😉", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
-        {"category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "bg_finance", "items": finance_news, "footer": "현명한 금융 습관이 밝은 미래를 만듭니다! 😉", "script": make_short_script("국내외 금융 소식입니다.", finance_news)},
-        {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg_social", "items": social_news, "footer": "세상을 밝히는 따뜻한 소식이 더 많아지길! 😉", "script": make_short_script("오늘의 주요 사회 소식입니다.", social_news)},
-        {"category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "bg_tip", "items": tip_news, "footer": "작은 상식 하나가 모여 큰 지혜가 됩니다! 😉", "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)}
+        {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요!", "script": make_short_script("건강 보험 소식입니다.", health_news)},
+        {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요!", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
+        {"category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "bg_finance", "items": finance_news, "footer": "현명한 금융 습관이 밝은 미래를 만듭니다!", "script": make_short_script("국내외 금융 소식입니다.", finance_news)},
+        {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg_social", "items": social_news, "footer": "세상을 밝히는 따뜻한 소식이 더 많아지길!", "script": make_short_script("오늘의 주요 사회 소식입니다.", social_news)},
+        {"category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "bg_tip", "items": tip_news, "footer": "작은 상식 하나가 모여 큰 지혜가 됩니다!", "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)}
     ]
 
     slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은 {today_str}입니다."}]
@@ -278,6 +305,7 @@ def create_full_news_video_with_audio():
                 draw_ov.text((45, current_y), num_str, fill=data["accent"]+(255,), font=font_num, anchor="la")
                 text_x = 45 + draw_ov.textlength(num_str, font=font_num)
                 
+                # 홀수는 화이트, 짝수는 연한 초록(민트)으로 교차 배치
                 text_color = (255, 255, 255, 255) if idx % 2 != 0 else (180, 250, 180, 255)
                 
                 for line in item["title"]:
@@ -291,6 +319,7 @@ def create_full_news_video_with_audio():
                     
                 current_y += gap_per_item
             
+            # 이모티콘 뺀 깔끔한 화이트 힐링 박스
             footer_y = box_bottom + 20
             footer_w = draw_ov.textlength(data["footer"], font=font_num)
             f_box_w = footer_w + 60
@@ -304,38 +333,53 @@ def create_full_news_video_with_audio():
             if profile_file:
                 avatar = get_circular_avatar(profile_file, (280, 280))
                 if avatar:
-                    overlay.paste(avatar, (img_width//2 - 140, 140), avatar)
+                    overlay.paste(avatar, (img_width//2 - 140, 130), avatar)
                     
-            draw_ov.text((img_width//2, 520), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
-            draw_ov.text((img_width//2, 600), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            draw_ov.text((img_width//2, 500), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
+            draw_ov.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
             
-            box_w = 480
-            box_x = (img_width - box_w) // 2
-            draw_ov.rounded_rectangle([box_x, 700, box_x + box_w, 920], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
+            # [수정] 마지막 장 명함 박스를 텍스트 너비에 맞춰 핏팅하고 정중앙 정렬
+            t1 = "010-2062-4600"
+            t2 = "PMSUNGOO"
+            t3 = "blog.naver.com/insureeasy"
             
-            info_start_y = 735
-            text_x = box_x + 80
+            w1 = draw_ov.textlength(t1, font=font_num)
+            w2 = draw_ov.textlength(t2, font=font_num)
+            w3 = draw_ov.textlength(t3, font=font_pub)
+            max_text_w = max(w1, w2, w3)
             
-            ix, iy = box_x + 35, info_start_y
-            draw_ov.rounded_rectangle([ix, iy, ix+24, iy+38], radius=4, fill=(241, 196, 15, 255))
-            draw_ov.rectangle([ix+3, iy+4, ix+21, iy+30], fill=(30, 35, 45, 255))
-            draw_ov.ellipse([ix+10, iy+33, ix+14, iy+35], fill=(255, 255, 255, 255))
-            draw_ov.text((text_x, iy + 6), "010-2062-4600", fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            box_w = 24 + 15 + max_text_w + 80
+            box_x = (img_width - box_w) / 2
             
-            iy += 65
+            draw_ov.rounded_rectangle([box_x, 680, box_x + box_w, 900], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
+            
+            info_start_y = 715
+            ix = box_x + 35
+            text_x = ix + 40
+            
+            # 수제작 전화기 로고
+            draw_ov.rounded_rectangle([ix, info_start_y, ix+24, info_start_y+38], radius=4, fill=(241, 196, 15, 255))
+            draw_ov.rectangle([ix+3, info_start_y+4, ix+21, info_start_y+30], fill=(30, 35, 45, 255))
+            draw_ov.ellipse([ix+10, info_start_y+33, ix+14, info_start_y+35], fill=(255, 255, 255, 255))
+            draw_ov.text((text_x, info_start_y + 6), t1, fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            # 수제작 카카오톡 로고
+            iy = info_start_y + 65
             draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
             draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
-            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm") # 여기에 font_small이 쓰입니다!
-            draw_ov.text((text_x, iy + 6), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
+            draw_ov.text((text_x, iy + 6), t2, fill=(255, 255, 255, 255), font=font_num, anchor="la")
             
+            # 수제작 지구본 로고
             iy += 65
             draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
             draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
             draw_ov.line([(ix, iy+12), (ix+24, iy+12)], fill=(255, 255, 255, 255), width=1)
             draw_ov.line([(ix+12, iy), (ix+12, iy+24)], fill=(255, 255, 255, 255), width=1)
-            draw_ov.text((text_x, iy + 3), "blog.naver.com/insureeasy", fill=(180, 200, 230, 255), font=font_pub, anchor="la")
+            draw_ov.text((text_x, iy + 3), t3, fill=(180, 200, 230, 255), font=font_pub, anchor="la")
             
-            draw_ov.text((img_width//2, 1100), "오늘도 행복한 하루 보내세요!", fill=(180, 200, 230, 255), font=font_pub, anchor="mm")
+            # [수정] 마지막 인사말을 크고 진한 황금색(Gold)으로 화면 하단에 강력하게 강조!
+            draw_ov.text((img_width//2, 1080), "오늘도 행복한 하루 보내세요!", fill=(255, 215, 0, 255), font=font_footer, anchor="mm")
 
         slide.paste(overlay, (0, 0), overlay)
         img_path = f"slide_{idx}.png"
@@ -349,9 +393,10 @@ def create_full_news_video_with_audio():
             tts.save(audio_path)
             
             final_audio_file = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.5)
-            
             audio_clip = AudioFileClip(final_audio_file)
-            actual_duration = audio_clip.duration + 1.5 
+            
+            # [수정] 오디오가 짤리지 않게 버퍼 시간을 1.5초에서 2.5초로 넉넉하게 확장
+            actual_duration = audio_clip.duration + 2.5 
             
             img_clip = ImageClip(img_path).set_duration(actual_duration)
             video_clip = img_clip.set_audio(audio_clip)
@@ -373,9 +418,9 @@ def send_email_with_video(video_path, receiver_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (얼티밋 마스터 V12.1)"
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (얼티밋 마스터 V13)"
     
-    body = "형! font_small 누락 에러 해결하고 힐링 화이트 박스까지 싹 다 적용된 최종본이야!"
+    body = "형! 오디오 끊김 방지, 야후 전일종가 고정, 아웃트로 센터정렬+노란색 강조 완벽 해결본이야!"
     msg.attach(MIMEText(body, 'plain'))
     
     try:
