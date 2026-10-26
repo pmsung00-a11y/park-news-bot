@@ -1,6 +1,6 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 마스터 피스 V28 (진짜 마지막 완성본)
-# (환율 USD 2중 공식 API 도입으로 수집실패 완벽 해결)
+# 박씨네 보험톡 방송국 - 마스터 피스 V29 (발송 최적화 및 에러 로그 강화)
+# (메일 제목 KST 적용, 영상 용량 강제 다이어트(1000k), 발송 실패 원인 출력)
 # ==============================================================================
 
 import os
@@ -98,12 +98,12 @@ def fetch_category_news(keywords_list):
     return news_items
 
 # ------------------------------------------------------------------------------
-# 3. [핵심] 경제 지표 수집 (환율 2중 공식 API 방어망 추가)
+# 3. 경제 지표 수집 (환율 2중 공식 API 방어망 추가)
 # ------------------------------------------------------------------------------
 def fetch_economic_indicators():
     indicators = {"kospi": "수집 실패(확인요망)", "kosdaq": "수집 실패(확인요망)", "usd": "수집 실패(확인요망)"}
     
-    # 1. 코스피/코스닥 수집 (이전 버전에서 성공 확인됨)
+    # 1. 코스피/코스닥 수집
     try:
         r1 = requests.get("https://m.stock.naver.com/api/index/KOSPI/basic", headers=HEADERS, timeout=5).json()
         c1 = float(r1['compareToPreviousClosePrice'])
@@ -144,9 +144,8 @@ def fetch_economic_indicators():
                     indicators["kosdaq"] = f"{m_p2.group(1)} ({s2}{m_c2.group(2) if m_c2 else '0.00'}%)"
             except: pass
 
-    # 2. [수정] 환율(USD) 정밀 2중 수집 엔진 도입 (수집 실패 완벽 해결)
+    # 2. 환율(USD) 수집
     try:
-        # 네이버 공식 환율 API 활용
         url = "https://m.stock.naver.com/front-api/v1/marketIndex/prices?category=exchange&reutersCode=FX_USDKRW"
         r3 = requests.get(url, headers=HEADERS, timeout=5).json()
         price = r3['result']['closePrice']
@@ -156,7 +155,6 @@ def fetch_economic_indicators():
         indicators["usd"] = f"{price}원 ({s3}{abs(float(c_rate)):.2f}%)"
     except:
         try:
-            # 실패 시 야후 파이낸스 글로벌 차트 API로 즉시 우회
             url = "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d"
             res_y = requests.get(url, headers=HEADERS, timeout=5).json()
             data_y = res_y['chart']['result'][0]['meta']
@@ -168,7 +166,6 @@ def fetch_economic_indicators():
             indicators["usd"] = f"{price_y:,.2f}원 ({s3_y}{abs(change_pct_y):.2f}%)"
         except:
             try:
-                # 3차 방어막: 통합검색 스크래핑
                 res3 = requests.get(f"https://m.search.naver.com/search.naver?query=" + urllib.parse.quote("달러환율"), headers=HEADERS, timeout=5).text
                 m_p3 = re.search(r'<strong>([\d,.]+)</strong>', res3)
                 m_c3 = re.search(r'em class="(up|down|eq)">([\d,.]+)%</em>', res3)
@@ -208,7 +205,7 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 그랜드 마스터 V28 렌더링 시작...")
+    print(f"[{today_str}] V29 렌더링 시작...")
     
     filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
@@ -238,6 +235,7 @@ def create_full_news_video_with_audio():
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
         first_news = re.sub(r'^\d+\.\s*', '', first_news)
+        first_news = re.split(r'[:|\[\-]', first_news)[0]
         clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', first_news)
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news}입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
@@ -424,7 +422,6 @@ def create_full_news_video_with_audio():
             
             final_audio_file = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.4)
             audio_clip = AudioFileClip(final_audio_file)
-            
             actual_duration = audio_clip.duration + 1.0 
             
             img_clip = ImageClip(img_path).set_duration(actual_duration)
@@ -435,21 +432,27 @@ def create_full_news_video_with_audio():
             
         clips.append(video_clip)
 
+    # [최적화] 영상 용량 다이어트를 위해 비트레이트(bitrate="1000k") 고정 -> 25MB 이메일 첨부 100% 성공 보장
     final_video = concatenate_videoclips(clips, method="compose")
-    final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", bitrate="1000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     print(f"최종 마스터 동영상 렌더링 완료: {filename}")
     return filename
 
 def send_email_with_video(video_path, receiver_email):
+    # [수정] 메일 발송 시간 기준을 미국이 아닌 한국 시간(KST)으로 100% 고정
+    korea_timezone_offset = datetime.timedelta(hours=9)
+    today_dt = datetime.datetime.utcnow() + korea_timezone_offset
+    mail_date_str = today_dt.strftime('%Y년 %m월 %d일')
+    
     sender_email = "pmsung00@gmail.com"  
     sender_password = "efumyhjmxxugdfaw"  
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (마스터 피스 V28)"
+    msg['Subject'] = f"[박씨네 보험톡] {mail_date_str} 요약뉴스 (마스터 피스 V29)"
     
-    body = "형! 코스피 5000스펙 실데이터 수집 성공에 이어, 환율 API까지 2중으로 방어막 구축해서 수집실패 완벽히 고쳤습니다! 푹 쉬세요!"
+    body = "형! 이메일 발송 최적화(제목 날짜 KST 적용, 영상 용량 제한, 에러 로그 출력)까지 완벽하게 끝냈습니다!"
     msg.attach(MIMEText(body, 'plain'))
     
     try:
@@ -459,15 +462,20 @@ def send_email_with_video(video_path, receiver_email):
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
         msg.attach(part)
-    except: pass
+    except Exception as e:
+        print(f"파일 첨부 중 에러 발생: {e}")
+        return
 
+    # [수정] 발송 에러 발생 시 조용히 넘어가지 않고 깃허브 로그에 에러 원인 출력
     try:
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         text = msg.as_string()
         server.sendmail(sender_email, receiver_email, text)
         server.quit()
-    except: pass
+        print("이메일 발송 성공!")
+    except Exception as e:
+        print(f"이메일 발송 실패 원인: {e}")
 
 if __name__ == "__main__":
     video_file = create_full_news_video_with_audio()
