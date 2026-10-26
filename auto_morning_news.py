@@ -206,4 +206,238 @@ def create_full_news_video_with_audio():
         {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요!", "script": make_short_script("건강 보험 소식입니다.", health_news)},
         {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요!", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
         {"category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "bg_finance", "items": finance_news, "footer": "현명한 금융 습관이 밝은 미래를 만듭니다!", "script": make_short_script("국내외 금융 소식입니다.", finance_news)},
-        {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg
+        {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg_social", "items": social_news, "footer": "세상을 밝히는 따뜻한 소식이 더 많아지길!", "script": make_short_script("오늘의 주요 사회 소식입니다.", social_news)},
+        {"category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "bg_tip", "items": tip_news, "footer": "작은 상식 하나가 모여 큰 지혜가 됩니다!", "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)}
+    ]
+
+    slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은 {today_str}입니다."}]
+    for i, cat in enumerate(news_database, start=1):
+        slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg_keyword": cat["bg_keyword"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
+    slides_data.append({"type": "outro", "script": "보험이 궁금할 땐 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 응원합니다."})
+
+    clips = []
+    
+    for idx, data in enumerate(slides_data, start=1):
+        if data["type"] in ["cover", "outro"]:
+            slide = Image.new("RGB", (img_width, img_height), color=(12, 18, 32))
+        else:
+            slide = Image.new("RGB", (img_width, img_height), color=(15, 20, 30))
+            bg_file = find_image(data.get("bg_keyword", "xxxxx"))
+            if bg_file:
+                try:
+                    bg_img = Image.open(bg_file)
+                    bg_img = ImageOps.fit(bg_img, (img_width, img_height), Image.Resampling.LANCZOS)
+                    slide.paste(bg_img, (0, 0))
+                except: pass
+            
+        overlay = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+        draw_ov = ImageDraw.Draw(overlay)
+
+        if data["type"] == "cover":
+            profile_file = find_image("profile")
+            if profile_file:
+                avatar = get_circular_avatar(profile_file, (340, 340))
+                if avatar:
+                    overlay.paste(avatar, (img_width//2 - 170, 140), avatar)
+            
+            draw_ov.text((img_width//2, 540), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
+            draw_ov.text((img_width//2, 640), "일일 주요뉴스", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            
+            draw_ov.rounded_rectangle([img_width//2 - 120, 730, img_width//2 + 120, 780], fill=(255, 255, 255, 20), radius=25)
+            draw_ov.text((img_width//2, 755), f"발행일 : {today_str}", fill=(180, 200, 230, 255), font=font_pub, anchor="mm")
+            
+            dash_y = 860
+            draw_ov.rounded_rectangle([70, dash_y, img_width - 70, dash_y + 260], fill=(0, 0, 0, 150), outline=(80, 90, 110, 255), width=2, radius=15)
+            draw_ov.text((img_width//2, dash_y + 40), "〓  오늘의 주요 경제 지표 (전일 기준)  〓", fill=(255, 215, 0, 255), font=font_pub, anchor="mm")
+            draw_ov.line([(90, dash_y + 80), (img_width-90, dash_y + 80)], fill=(80, 90, 110, 255), width=1)
+            
+            draw_ov.text((100, dash_y + 120), "KOSPI", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
+            draw_ov.text((img_width - 100, dash_y + 120), eco_data["kospi"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
+            
+            draw_ov.text((100, dash_y + 175), "KOSDAQ", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
+            draw_ov.text((img_width - 100, dash_y + 175), eco_data["kosdaq"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
+
+            draw_ov.text((100, dash_y + 230), "환율 (USD)", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
+            draw_ov.text((img_width - 100, dash_y + 230), eco_data["usd"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
+
+        elif data["type"] == "news":
+            # 1. 상단 제목 박스 (글자 길이에 맞춤)
+            cat_w = draw_ov.textlength(data['category'], font=font_title)
+            title_box_w = cat_w + 80
+            title_box_x1 = 360 - title_box_w // 2
+            title_box_x2 = 360 + title_box_w // 2
+            
+            r, g, b = data["accent"]
+            draw_ov.rectangle([0, 70, img_width, 80], fill=data["accent"]+(255,))
+            draw_ov.rounded_rectangle([title_box_x1, 110, title_box_x2, 170], fill=(r//3, g//3, b//3, 255), radius=10)
+            draw_ov.text((img_width//2, 140), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
+            
+            start_y = 230
+            parsed_items = []
+            total_text_height = 0
+            
+            for item in data['items'][:8]:
+                parts = item.split('|')
+                title = parts[0]
+                pub = parts[1] if len(parts) > 1 else ""
+                
+                wrapped = textwrap.wrap(title, 27)
+                item_h = len(wrapped) * 34 
+                if pub: item_h += 28       
+                
+                total_text_height += item_h
+                parsed_items.append({"title": wrapped, "pub": pub})
+                
+            available_gap = (1120 - start_y) - total_text_height
+            gap_per_item = max(10, min(available_gap / len(parsed_items), 45)) if parsed_items else 20
+            
+            calculated_bottom = start_y
+            for item in parsed_items:
+                calculated_bottom += len(item["title"]) * 34
+                if item["pub"]: calculated_bottom += 28
+                calculated_bottom += gap_per_item
+            
+            box_bottom = calculated_bottom - gap_per_item + 20
+            
+            # 본문 거대 박스 (좌우 25px~695px로 꽉 찬 사이즈 고정)
+            draw_ov.rounded_rectangle([25, 200, 695, box_bottom], fill=(0, 0, 0, 200), outline=data["accent"]+(150,), width=2, radius=15)
+            
+            current_y = start_y
+            for idx, item in enumerate(parsed_items, 1):
+                num_str = f"{idx:02d}. "
+                draw_ov.text((45, current_y), num_str, fill=data["accent"]+(255,), font=font_num, anchor="la")
+                text_x = 45 + draw_ov.textlength(num_str, font=font_num)
+                
+                text_color = (255, 255, 255, 255) if idx % 2 != 0 else (180, 250, 180, 255)
+                
+                for line in item["title"]:
+                    draw_ov.text((text_x, current_y), line, fill=text_color, font=font_main, anchor="la")
+                    current_y += 34
+                    
+                if item["pub"]:
+                    pub_w = draw_ov.textlength(item["pub"], font=font_pub)
+                    draw_ov.text((670 - pub_w, current_y), item["pub"], fill=data["accent"]+(255,), font=font_pub, anchor="la")
+                    current_y += 28
+                    
+                current_y += gap_per_item
+            
+            # [핵심] 하단 힐링 문구 박스의 길이를 '본문 박스(25px~695px)'와 100% 동일하게 고정
+            footer_y = box_bottom + 20
+            # 좌표값을 본문 박스와 완벽히 똑같은 25와 695로 지정했습니다.
+            draw_ov.rounded_rectangle([25, footer_y, 695, footer_y + 55], fill=(255, 255, 255, 255), outline=(220, 50, 50, 255), width=3, radius=15)
+            # 글씨 크기도 박스에 맞게 시원한 28pt 사이즈로 중앙 정렬!
+            draw_ov.text((img_width//2, footer_y + 27), data["footer"], fill=(0, 0, 0, 255), font=font_healing, anchor="mm")
+            
+        elif data["type"] == "outro":
+            profile_file = find_image("profile")
+            if profile_file:
+                avatar = get_circular_avatar(profile_file, (280, 280))
+                if avatar:
+                    overlay.paste(avatar, (img_width//2 - 140, 130), avatar)
+                    
+            draw_ov.text((img_width//2, 500), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
+            draw_ov.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            
+            t1 = "010-2062-4600"
+            t2 = "PMSUNGOO"
+            t3 = "blog.naver.com/insureeasy"
+            
+            w1 = draw_ov.textlength(t1, font=font_num)
+            w2 = draw_ov.textlength(t2, font=font_num)
+            w3 = draw_ov.textlength(t3, font=font_pub)
+            max_text_w = max(w1, w2, w3)
+            
+            out_box_w = 24 + 15 + max_text_w + 80
+            out_box_x = (img_width - out_box_w) / 2
+            
+            draw_ov.rounded_rectangle([out_box_x, 680, out_box_x + out_box_w, 900], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
+            
+            info_start_y = 715
+            ix = out_box_x + 35
+            text_x = ix + 40
+            
+            draw_ov.rounded_rectangle([ix, info_start_y, ix+24, info_start_y+38], radius=4, fill=(241, 196, 15, 255))
+            draw_ov.rectangle([ix+3, info_start_y+4, ix+21, info_start_y+30], fill=(30, 35, 45, 255))
+            draw_ov.ellipse([ix+10, info_start_y+33, ix+14, info_start_y+35], fill=(255, 255, 255, 255))
+            draw_ov.text((text_x, info_start_y + 6), t1, fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            iy = info_start_y + 65
+            draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
+            draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
+            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
+            draw_ov.text((text_x, iy + 6), t2, fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            iy += 65
+            draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
+            draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix, iy+12), (ix+24, iy+12)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix+12, iy), (ix+12, iy+24)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.text((text_x, iy + 3), t3, fill=(180, 200, 230, 255), font=font_pub, anchor="la")
+            
+            draw_ov.text((img_width//2, 1080), "오늘도 행복한 하루 보내세요!", fill=(255, 215, 0, 255), font=font_footer, anchor="mm")
+
+        slide.paste(overlay, (0, 0), overlay)
+        img_path = f"slide_{idx}.png"
+        slide.save(img_path)
+        
+        audio_path = f"audio_{idx}.mp3"
+        fast_audio_path = f"fast_audio_{idx}.wav"
+        
+        try:
+            tts = gTTS(text=data["script"], lang="ko")
+            tts.save(audio_path)
+            
+            final_audio_file = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.4)
+            audio_clip = AudioFileClip(final_audio_file)
+            
+            # [핵심] 오디오 끝에 나는 기계음(스파크 소리) 완벽 제거를 위한 내장 페이드아웃 적용
+            audio_clip = audio_clip.fx(afx.audio_fadeout, 0.3)
+            
+            actual_duration = audio_clip.duration + 1.0 
+            
+            img_clip = ImageClip(img_path).set_duration(actual_duration)
+            video_clip = img_clip.set_audio(audio_clip)
+        except Exception as e:
+            print(f"오디오 치명적 예외: {e}")
+            video_clip = ImageClip(img_path).set_duration(6.0)
+            
+        clips.append(video_clip)
+
+    final_video = concatenate_videoclips(clips, method="compose")
+    final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    print(f"최종 마스터 동영상 렌더링 완료: {filename}")
+    return filename
+
+def send_email_with_video(video_path, receiver_email):
+    sender_email = "pmsung00@gmail.com"  
+    sender_password = "efumyhjmxxugdfaw"  
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg['Subject'] = f"[박씨네 보험톡] {datetime.datetime.now().strftime('%Y년 %m월 %d일')} 요약뉴스 (그랜드 마스터 V24)"
+    
+    body = "형! 오디오 기계음 페이드아웃 완료, 하단 박스 본문 길이와 100% 동일 핏팅 완벽 조치!"
+    msg.attach(MIMEText(body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
+        msg.attach(part)
+    except: pass
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+    except: pass
+
+if __name__ == "__main__":
+    video_file = create_full_news_video_with_audio()
+    send_email_with_video(video_file, "pmsung00@gmail.com")
+# --- END OF CODE ---
