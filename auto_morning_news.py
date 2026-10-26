@@ -220,7 +220,7 @@ def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
-    print(f"[{today_str}] 디 엔드 V36 렌더링 시작...")
+    print(f"[{today_str}] 무결점 종결판 V36 렌더링 시작...")
     
     # [핵심 1] 1초 무음 파일 생성 (영상 전체가 부드러워지는 1초의 기적)
     silence_wav = create_silence_wav()
@@ -250,11 +250,11 @@ def create_full_news_video_with_audio():
     social_news = fetch_category_news(["사건 사고", "생활 안전", "기상 날씨", "교통 패스", "지자체 소식", "교육 정책", "복지 정책", "사회 공헌"])
     tip_news = fetch_category_news(["연말정산 꿀팁", "정부 지원금", "소상공인 지원", "알뜰폰 요금제", "절세 방법", "청년 혜택", "할인 행사", "카드 혜택"])
 
-    # [핵심 2] 무식하게 자르던 정규식을 삭제하고 오직 한글, 영문, 숫자만 남겨 자연스럽게 다 읽어줌
+    # [핵심 2] 무식하게 자르던 특수기호 대시(-) 정규식을 완벽하게 삭제하여 멘트 짤림 원천 복구!
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
         first_news = re.sub(r'^\d+\.\s*', '', first_news)
-        # 문제가 되었던 re.split(r'[:|\[\-]', first_news)[0] 코드를 완전히 삭제했습니다!
+        # 문제가 되었던 코드를 100% 날렸습니다! (re.split 삭제)
         clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', first_news)
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
         return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news}입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
