@@ -26,3 +26,9 @@ jobs:
 
     - name: Run news briefing bot
       run: python auto_morning_news.py
+    - name: 파이썬 뉴스봇 실행하기
+      env:
+        YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+        YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+        YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      run: python park_news_bot.py 
