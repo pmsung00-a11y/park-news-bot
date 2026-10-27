@@ -1,5 +1,5 @@
 # ==============================================================================
-# 해외 도서 AI 큐레이터 - 기본 뼈대 (영상제작 + 유튜브 자동 업로드 비공개 세팅 완료)
+# 박씨네 보험톡 방송국 - 최종 마스터 (네이버 지표 수집 오류 해결 + 유튜브 비공개 세팅)
 # ==============================================================================
 
 import os
@@ -27,12 +27,14 @@ from googleapiclient.http import MediaFileUpload
 WORK_DIR = "work"
 os.makedirs(WORK_DIR, exist_ok=True)
 
+# 네이버 '수집 실패' 방지를 위해 Referer 출입증 추가
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Referer': 'https://m.stock.naver.com/'
 }
 
-# --- (이하 영상 제작부: 추후 해외 도서 크롤링 로직으로 교체할 기본 뼈대) ---
+# --- (이하 뉴스 수집 및 영상 제작 함수들은 기존 박씨네 보험톡 오리지널 100% 동일) ---
 
 def _run_ffmpeg(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -99,7 +101,7 @@ def fetch_category_news(keywords_list):
         news = fetch_one_top_news(keyword)
         if news: news_items.append(news)
     if not news_items:
-        news_items.append("도서 정보를 취합 중입니다.|[시스템]")
+        news_items.append("오늘의 주요 뉴스를 취합 중입니다.|[시스템]")
     return news_items
 
 def fetch_economic_indicators():
@@ -164,7 +166,7 @@ def create_full_news_video_with_audio():
     today_str = today_dt.strftime("%Y년 %m월 %d일")
     print(f"[{today_str}] 렌더링 시작...")
     
-    filename = f"book_review_{today_dt.strftime('%Y%m%d')}.mp4"
+    filename = f"park_news_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
     
     def load_font(bold, size):
@@ -187,22 +189,31 @@ def create_full_news_video_with_audio():
     font_healing = load_font(True, 34)
 
     eco_data = fetch_economic_indicators()
-    test_news = fetch_category_news(["베스트셀러", "신간 도서", "해외 문학", "자기계발서"])
+
+    health_news = fetch_category_news(["건강보험공단", "실손보험 청구", "요양병원 정책", "보건복지부", "비급여 진료", "국민연금 개혁", "암보험", "건강 상식"])
+    econ_news = fetch_category_news(["서울 아파트값", "전세 대출", "한국은행 금리", "부동산 PF", "신규 분양", "청약 경쟁률", "부동산 정책", "재건축"])
+    finance_news = fetch_category_news(["코스피 마감 시황", "미국 증시 나스닥", "원달러 환율 종가", "퇴직연금", "비트코인 시세", "금값 시세", "주식 배당금", "금융 당국"])
+    social_news = fetch_category_news(["사건 사고", "생활 안전", "기상 날씨", "교통 패스", "지자체 소식", "교육 정책", "복지 정책", "사회 공헌"])
+    tip_news = fetch_category_news(["연말정산 꿀팁", "정부 지원금", "소상공인 지원", "알뜰폰 요금제", "절세 방법", "청년 혜택", "할인 행사", "카드 혜택"])
 
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
         first_news = re.sub(r'^\d+\.\s*', '', first_news)
         clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', first_news)
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
-        return f"{intro} 오늘 주목할 도서는 {clean_news}입니다. 그 외 화면의 추천 도서도 확인해 보십시오."
+        return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news}입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
 
     news_database = [
-        {"category": "해외 우수 도서 추천", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": test_news, "footer": "좋은 책 한 권이 인생을 바꿉니다!", "script": make_short_script("해외 도서 추천 소식입니다.", test_news)},
+        {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요!", "script": make_short_script("건강 보험 소식입니다.", health_news)},
+        {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요!", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
+        {"category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "bg_finance", "items": finance_news, "footer": "현명한 금융 습관이 밝은 미래를 만듭니다!", "script": make_short_script("국내외 금융 소식입니다.", finance_news)},
+        {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg_social", "items": social_news, "footer": "세상을 밝히는 따뜻한 소식이 더 많아지길!", "script": make_short_script("오늘의 주요 사회 소식입니다.", social_news)},
+        {"category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "bg_tip", "items": tip_news, "footer": "작은 상식 하나가 모여 큰 지혜가 됩니다!", "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)}
     ]
 
-    slides_data = [{"type": "cover", "script": f"안녕하십니까, AI 글로벌 도서 큐레이터입니다. 오늘 추천 도서 발행일은 {today_str}입니다."}]
+    slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은 {today_str}입니다."}]
     for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg_keyword": cat["bg_keyword"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
-    slides_data.append({"type": "outro", "script": "더 많은 인생 책이 궁금하시다면 구독과 좋아요를 부탁드립니다. 오늘도 행복한 하루 보내세요."})
+    slides_data.append({"type": "outro", "script": "보험이 궁금할 땐 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 응원합니다."})
 
     clips = []
     for slide_no, data in enumerate(slides_data, start=1):
@@ -225,13 +236,13 @@ def create_full_news_video_with_audio():
             if profile_file:
                 avatar = get_circular_avatar(profile_file, (340, 340))
                 if avatar: overlay.paste(avatar, (img_width//2 - 170, 140), avatar)
-            draw_ov.text((img_width//2, 540), "AI 글로벌", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
-            draw_ov.text((img_width//2, 640), "우수 도서 큐레이션", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            draw_ov.text((img_width//2, 540), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
+            draw_ov.text((img_width//2, 640), "일일 주요뉴스", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
             draw_ov.rounded_rectangle([img_width//2 - 120, 730, img_width//2 + 120, 780], fill=(255, 255, 255, 20), radius=25)
             draw_ov.text((img_width//2, 755), f"발행일 : {today_str}", fill=(180, 200, 230, 255), font=font_pub, anchor="mm")
             dash_y = 860
             draw_ov.rounded_rectangle([70, dash_y, img_width - 70, dash_y + 260], fill=(0, 0, 0, 150), outline=(80, 90, 110, 255), width=2, radius=15)
-            draw_ov.text((img_width//2, dash_y + 40), "〓  오늘의 글로벌 경제 지표 (참고)  〓", fill=(255, 215, 0, 255), font=font_pub, anchor="mm")
+            draw_ov.text((img_width//2, dash_y + 40), "〓  오늘의 주요 경제 지표 (전일 기준)  〓", fill=(255, 215, 0, 255), font=font_pub, anchor="mm")
             draw_ov.line([(90, dash_y + 80), (img_width-90, dash_y + 80)], fill=(80, 90, 110, 255), width=1)
             draw_ov.text((100, dash_y + 120), "KOSPI", fill=(200, 210, 230, 255), font=font_pub, anchor="lm")
             draw_ov.text((img_width - 100, dash_y + 120), eco_data["kospi"], fill=(255, 255, 255, 255), font=font_num, anchor="rm")
@@ -287,9 +298,34 @@ def create_full_news_video_with_audio():
             if profile_file:
                 avatar = get_circular_avatar(profile_file, (280, 280))
                 if avatar: overlay.paste(avatar, (img_width//2 - 140, 130), avatar)
-            draw_ov.text((img_width//2, 500), "인생 책이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
-            draw_ov.text((img_width//2, 580), "AI 글로벌 북 큐레이터", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
-            draw_ov.text((img_width//2, 1080), "오늘도 독서로 성장하는 하루 보내세요!", fill=(255, 215, 0, 255), font=font_footer, anchor="mm")
+            draw_ov.text((img_width//2, 500), "보험이 궁금할 땐?", fill=(255, 255, 255, 255), font=font_large, anchor="mm")
+            draw_ov.text((img_width//2, 580), "박씨네 보험톡", fill=(255, 215, 0, 255), font=font_huge, anchor="mm")
+            t1, t2, t3 = "010-2062-4600", "PMSUNGOO", "blog.naver.com/insureeasy"
+            max_text_w = max(draw_ov.textlength(t1, font=font_num), draw_ov.textlength(t2, font=font_num), draw_ov.textlength(t3, font=font_pub))
+            out_box_w = 24 + 15 + max_text_w + 80
+            out_box_x = (img_width - out_box_w) / 2
+            draw_ov.rounded_rectangle([out_box_x, 680, out_box_x + out_box_w, 900], fill=(30, 35, 45, 255), outline=(100, 110, 130, 255), width=2, radius=15)
+            
+            info_start_y, ix = 715, out_box_x + 35
+            text_x = ix + 40
+            draw_ov.rounded_rectangle([ix, info_start_y, ix+24, info_start_y+38], radius=4, fill=(241, 196, 15, 255))
+            draw_ov.rectangle([ix+3, info_start_y+4, ix+21, info_start_y+30], fill=(30, 35, 45, 255))
+            draw_ov.ellipse([ix+10, info_start_y+33, ix+14, info_start_y+35], fill=(255, 255, 255, 255))
+            draw_ov.text((text_x, info_start_y + 6), t1, fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            iy = info_start_y + 65
+            draw_ov.ellipse([ix-3, iy+2, ix+27, iy+28], fill=(250, 225, 0, 255))
+            draw_ov.polygon([(ix+4, iy+24), (ix+8, iy+36), (ix+12, iy+26)], fill=(250, 225, 0, 255))
+            draw_ov.text((ix+12, iy+15), "TALK", fill=(0, 0, 0, 255), font=font_small, anchor="mm")
+            draw_ov.text((text_x, iy + 6), t2, fill=(255, 255, 255, 255), font=font_num, anchor="la")
+            
+            iy += 65
+            draw_ov.ellipse([ix, iy, ix+24, iy+24], fill=(52, 152, 219, 255))
+            draw_ov.ellipse([ix+3, iy, ix+21, iy+24], outline=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix, iy+12), (ix+24, iy+12)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.line([(ix+12, iy), (ix+12, iy+24)], fill=(255, 255, 255, 255), width=1)
+            draw_ov.text((text_x, iy + 3), t3, fill=(180, 200, 230, 255), font=font_pub, anchor="la")
+            draw_ov.text((img_width//2, 1080), "오늘도 행복한 하루 보내세요!", fill=(255, 215, 0, 255), font=font_footer, anchor="mm")
 
         slide.paste(overlay, (0, 0), overlay)
         img_path = os.path.join(WORK_DIR, f"slide_{slide_no}.png")
@@ -315,12 +351,12 @@ def create_full_news_video_with_audio():
 
 def send_email_with_video(video_path, receiver_email, today_str):
     sender_email = "pmsung00@gmail.com"  
-    sender_password = "eurhztmevmaxlqki"
+    sender_password = "eurhztmevmaxlqki" # 형의 구글 앱 비밀번호
     
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
-    msg['Subject'] = f"[AI 도서 큐레이터] {today_str} 해외 추천 도서 영상"
-    msg.attach(MIMEText(f"{today_str} AI가 추천하는 해외 우수 도서 영상을 첨부합니다.", 'plain'))
+    msg['Subject'] = f"[박씨네 보험톡] {today_str} 요약뉴스"
+    msg.attach(MIMEText(f"{today_str} 박씨네 보험톡 일일 주요뉴스 영상을 첨부합니다.", 'plain'))
     
     try:
         with open(video_path, "rb") as attachment:
@@ -336,9 +372,8 @@ def send_email_with_video(video_path, receiver_email, today_str):
         print("이메일 발송 성공!")
     except Exception as e: print(f"이메일 발송 실패: {e}")
 
-
 # ------------------------------------------------------------------------------
-# 📺 6. 대망의 유튜브 자동 업로드 모듈! (해외 도서 추천 테마 적용 완료)
+# 📺 6. 유튜브 자동 업로드 모듈 (박씨네 보험톡 원본 + 비공개 설정)
 # ------------------------------------------------------------------------------
 def upload_to_youtube(video_path, today_str):
     print("유튜브 업로드를 시작합니다...")
@@ -351,7 +386,6 @@ def upload_to_youtube(video_path, today_str):
         print("⚠️ 깃허브 금고(Secrets)에 유튜브 키가 없어서 업로드를 건너뜁니다.")
         return
 
-    # 마스터 키(Refresh Token)를 이용해 권한 부여
     creds = Credentials(
         None,
         refresh_token=refresh_token,
@@ -362,29 +396,28 @@ def upload_to_youtube(video_path, today_str):
 
     youtube = build("youtube", "v3", credentials=creds)
     
-    # 1. 제목 설정 (해외 도서 테마)
-    title = f"[{today_str}] AI가 추천하는 오늘의 해외 우수 도서 베스트 (3분 요약)"
-    
-    # 2. 본문 내용 설정 (해외 도서 테마)
-    description = f"""안녕하세요! AI 글로벌 도서 큐레이터입니다.
-오늘({today_str}) 주목해야 할 해외 우수 도서를 엄선하여 3분 만에 핵심만 요약해 드립니다.
+    # 박씨네 보험톡 원본 제목 및 설명 복구
+    title = f"[{today_str}] 박씨네 보험톡 일일 주요뉴스 브리핑 (경제/건강/생활)"
+    description = f"""안녕하십니까! 박씨네 보험톡입니다.
+오늘({today_str})의 핵심 뉴스와 경제 지표를 빠르게 브리핑해 드립니다.
 
-📚 매일 업데이트되는 세계의 양서 리뷰!
-구독과 좋아요를 누르시면 인생의 인사이트를 넓혀줄 글로벌 베스트셀러를 가장 먼저 만나보실 수 있습니다.
+📺 매일 아침 업데이트되는 보험, 경제, 상식 뉴스!
+구독과 좋아요를 누르시면 매일 유익한 정보를 가장 먼저 받아보실 수 있습니다.
 
-해외 도서 및 비즈니스 문의:
-📧 pmsung00@gmail.com"""
+상담 및 문의:
+📞 010-2062-4600
+💬 카카오톡: PMSUNGOO
+🌐 블로그: blog.naver.com/insureeasy"""
 
     body = {
         "snippet": {
             "title": title,
             "description": description,
-            "tags": ["해외도서", "책추천", "AI도서리뷰", "베스트셀러", "자기계발서", "북튜버"],
-            "categoryId": "27"  # 교육
+            "tags": ["박씨네보험톡", "보험뉴스", "경제뉴스", "건강보험", "오늘의뉴스"],
+            "categoryId": "25"
         },
         "status": {
-            # 3. 공개 여부: '비공개(private)'로 설정
-            "privacyStatus": "private"  
+            "privacyStatus": "private"  # 형이 요청하신 비공개(private) 세팅 완료!
         }
     }
 
