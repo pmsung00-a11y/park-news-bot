@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 최종 마스터 (네이버 지표 수정 + 뉴스 섞기 + 유튜브 비공개)
+# 박씨네 보험톡 방송국 - 최종 픽스본 (환율 5중 우회 + 최신 뉴스 시간순 정렬 적용)
 # ==============================================================================
 
 import os
@@ -10,7 +10,9 @@ import xml.etree.ElementTree as ET
 import re
 import subprocess
 import requests
-import random  # 매일 뉴스가 똑같이 나오는 현상을 막기 위한 랜덤 섞기 기능 추가
+import random
+import difflib
+from email.utils import parsedate_to_datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -28,13 +30,17 @@ from googleapiclient.http import MediaFileUpload
 WORK_DIR = "work"
 os.makedirs(WORK_DIR, exist_ok=True)
 
-# 네이버 '수집 실패' 방지를 위해 Referer 출입증 추가
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
     'Referer': 'https://m.stock.naver.com/'
 }
 
+MAX_AGE_HOURS = 36  # 이보다 오래된 기사는 쓰지 않음 (같은 기사 반복 방지)
+
+# ------------------------------------------------------------------------------
+# 📺 1. 오디오/비디오 유틸리티
+# ------------------------------------------------------------------------------
 def _run_ffmpeg(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if r.returncode != 0:
@@ -62,79 +68,176 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
         _run_ffmpeg(fb)
         return output_path
 
-def fetch_one_top_news(keyword):
-    search_query_1d = f"{keyword} when:1d"
-    url_1d = f"https://news.google.com/rss/search?q={urllib.parse.quote(search_query_1d)}&hl=ko&gl=KR&ceid=KR:ko"
-    search_query_all = keyword
-    url_all = f"https://news.google.com/rss/search?q={urllib.parse.quote(search_query_all)}&hl=ko&gl=KR&ceid=KR:ko"
-    
-    for target_url in [url_1d, url_all]:
+# ------------------------------------------------------------------------------
+# 📰 2. 뉴스 수집 (발행시각 기반 최신순 정렬 + 중복 제거)
+# ------------------------------------------------------------------------------
+def _split_title(title):
+    publisher, news_title = "", title
+    if ' - ' in title:
+        news_title, publisher = title.rsplit(' - ', 1)
+    elif title.startswith('['):
+        m = re.match(r'^\[(.*?)\]\s*(.*)', title)
+        if m:
+            publisher, news_title = m.group(1), m.group(2)
+    return news_title.strip(), publisher.strip()
+
+def fetch_fresh_candidates(keyword, per_keyword=3):
+    url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(f"{keyword} when:1d")
+           + "&hl=ko&gl=KR&ceid=KR:ko")
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        root = ET.fromstring(resp.content)
+    except Exception as e:
+        print(f"  [뉴스] '{keyword}' 수집 실패: {e}")
+        return []
+    now = datetime.datetime.now(datetime.timezone.utc)
+    out = []
+    for it in root.findall('.//item')[:10]:
+        t, pd = it.findtext('title'), it.findtext('pubDate')
+        if not t or not pd:
+            continue
         try:
-            response = requests.get(target_url, headers=HEADERS, timeout=10)
-            root = ET.fromstring(response.content)
-            items = root.findall('.//item')
-            if len(items) > 0:
-                title = items[0].find('title').text
-                publisher = ""
-                news_title = title
-                if ' - ' in title:
-                    parts = title.rsplit(' - ', 1)
-                    news_title = parts[0]
-                    publisher = parts[1]
-                elif title.startswith('['):
-                    match = re.match(r'^\[(.*?)\]\s*(.*)', title)
-                    if match:
-                        publisher = match.group(1)
-                        news_title = match.group(2)
-                if len(news_title) > 8:
-                    if publisher:
-                        return f"{news_title.strip()}|[{publisher.strip()}]"
-                    else:
-                        return f"{news_title.strip()}|"
-        except Exception: continue
+            dt = parsedate_to_datetime(pd)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+        except Exception:
+            continue
+        if (now - dt).total_seconds() / 3600 > MAX_AGE_HOURS:
+            continue
+        title, pub = _split_title(t)
+        if len(title) > 8:
+            out.append({"title": title, "pub": pub, "dt": dt, "kw": keyword})
+    out.sort(key=lambda x: x["dt"], reverse=True)
+    return out[:per_keyword]
+
+def _norm(t):
+    return re.sub(r'[^가-힣a-zA-Z0-9]', '', t)
+
+def fetch_category_news(keywords_list, max_items=8):
+    pool = []
+    for kw in keywords_list:
+        pool.extend(fetch_fresh_candidates(kw))
+    pool.sort(key=lambda x: x["dt"], reverse=True)
+
+    picked, per_kw = [], {}
+    for c in pool:
+        if per_kw.get(c["kw"], 0) >= 2:
+            continue
+        if any(difflib.SequenceMatcher(None, _norm(c["title"]), _norm(p["title"])).ratio() > 0.55 for p in picked):
+            continue
+        picked.append(c)
+        per_kw[c["kw"]] = per_kw.get(c["kw"], 0) + 1
+        if len(picked) >= max_items:
+            break
+
+    if not picked:
+        print("  [뉴스] 최근 기사를 하나도 못 찾았습니다.")
+        return ["오늘의 주요 뉴스를 취합 중입니다.|[시스템]"]
+    kst = datetime.timezone(datetime.timedelta(hours=9))
+    for p in picked:
+        print(f"  [뉴스] {p['dt'].astimezone(kst):%m-%d %H:%M} ({p['kw']}) {p['title'][:40]}")
+    return [f"{p['title']}|[{p['pub']}]" if p['pub'] else f"{p['title']}|" for p in picked]
+
+# ------------------------------------------------------------------------------
+# 📈 3. 경제 지표 (환율 5중 우회 + 코스피/코스닥)
+# ------------------------------------------------------------------------------
+def _num(v):
+    try:
+        return float(str(v).replace(',', '').replace('%', '').replace('+', '').strip())
+    except Exception:
+        return None
+
+def _find(obj, keys):
+    stack = [obj]
+    while stack:
+        cur = stack.pop(0)
+        if isinstance(cur, dict):
+            for k in keys:
+                if k in cur and cur[k] not in (None, ""):
+                    return cur[k]
+            stack.extend(cur.values())
+        elif isinstance(cur, list):
+            stack.extend(cur)
     return None
 
-def fetch_category_news(keywords_list):
-    news_items = []
-    # 💡 핵심 수정: 매일 똑같은 첫 뉴스가 나오는 것을 막기 위해 검색어 순서를 무작위로 섞음
-    shuffled_keywords = random.sample(keywords_list, len(keywords_list))
-    
-    for keyword in shuffled_keywords:
-        news = fetch_one_top_news(keyword)
-        if news:
-            # 💡 중복 뉴스 방지: 이미 수집된 뉴스 제목과 비슷한 경우 건너뜀
-            if not any(news.split('|')[0] in item for item in news_items):
-                news_items.append(news)
-    
-    if not news_items:
-        news_items.append("오늘의 주요 뉴스를 취합 중입니다.|[시스템]")
-    return news_items
+def _arrow(direction):
+    return "▲" if direction > 0 else "▼" if direction < 0 else "-"
+
+def _naver_direction(data, change, ratio):
+    d = _find(data, ['compareToPreviousPrice'])
+    name = str(d.get('name') if isinstance(d, dict) else d or '').upper()
+    if 'RIS' in name or 'UPPER' in name: return 1
+    if 'FALL' in name or 'LOWER' in name: return -1
+    if 'EVEN' in name: return 0
+    for v in (change, ratio):
+        if v: return 1 if v > 0 else -1
+    return 0
+
+def _usd_from_naver(url):
+    data = requests.get(url, headers=HEADERS, timeout=7).json()
+    price = _num(_find(data, ['closePrice', 'nowVal', 'tradePrice']))
+    ratio = _num(_find(data, ['fluctuationsRatio', 'changeRate']))
+    change = _num(_find(data, ['compareToPreviousClosePrice', 'fluctuations', 'changePrice']))
+    if price is None:
+        raise ValueError("가격 필드를 찾지 못함")
+    return price, abs(ratio or 0.0), _naver_direction(data, change, ratio)
+
+def _usd_from_yahoo():
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d"
+    meta = requests.get(url, headers={'User-Agent': HEADERS['User-Agent']}, timeout=7).json()['chart']['result'][0]['meta']
+    price = meta['regularMarketPrice']
+    prev = meta.get('chartPreviousClose') or meta.get('previousClose')
+    chg = price - prev
+    return price, abs(chg / prev * 100), (1 if chg > 0 else -1 if chg < 0 else 0)
+
+def _usd_from_naver_calc():
+    url = ("https://m.search.naver.com/p/csearch/content/qapirender.nhn?key=calculator&pkid=141"
+           "&q=%ED%99%98%EC%9C%A8&where=m&u1=keb&u6=standardUnit&u7=0&u3=USD&u4=KRW&u8=down&u2=1")
+    data = requests.get(url, headers=HEADERS, timeout=7).json()
+    return _num(data['country'][1]['value']), None, 0
+
+def _usd_from_open_api():
+    data = requests.get("https://open.er-api.com/v6/latest/USD", timeout=7).json()
+    return float(data['rates']['KRW']), None, 0
+
+def fetch_usd_krw():
+    sources = [
+        ("네이버 환율 API", lambda: _usd_from_naver("https://api.stock.naver.com/marketindex/exchange/FX_USDKRW")),
+        ("네이버 front-api", lambda: _usd_from_naver("https://m.stock.naver.com/front-api/marketIndex/productDetail?category=exchange&reutersCode=FX_USDKRW")),
+        ("Yahoo", _usd_from_yahoo),
+        ("네이버 계산기", _usd_from_naver_calc),
+        ("open.er-api", _usd_from_open_api),
+    ]
+    for name, fn in sources:
+        try:
+            price, ratio, direction = fn()
+            if not price or price < 500:
+                raise ValueError(f"이상한 값: {price}")
+            txt = f"{price:,.2f}원"
+            if ratio is not None:
+                txt += f" ({_arrow(direction)}{ratio:.2f}%)"
+            print(f"  [환율] {name} 성공 → {txt}")
+            return txt
+        except Exception as e:
+            print(f"  [환율] {name} 실패: {type(e).__name__}: {str(e)[:80]}")
+    return "수집 실패"
 
 def fetch_economic_indicators():
     indicators = {"kospi": "수집 실패", "kosdaq": "수집 실패", "usd": "수집 실패"}
-    try:
-        r1 = requests.get("https://m.stock.naver.com/api/index/KOSPI/basic", headers=HEADERS, timeout=5).json()
-        c1 = float(r1['compareToPreviousClosePrice'])
-        s1 = "▲" if c1 > 0 else "▼" if c1 < 0 else "-"
-        indicators["kospi"] = f"{r1['closePrice']} ({s1}{abs(float(r1['fluctuationsRatio'])):.2f}%)"
-    except Exception: pass
-    try:
-        r2 = requests.get("https://m.stock.naver.com/api/index/KOSDAQ/basic", headers=HEADERS, timeout=5).json()
-        c2 = float(r2['compareToPreviousClosePrice'])
-        s2 = "▲" if c2 > 0 else "▼" if c2 < 0 else "-"
-        indicators["kosdaq"] = f"{r2['closePrice']} ({s2}{abs(float(r2['fluctuationsRatio'])):.2f}%)"
-    except Exception: pass
-    try:
-        url = "https://m.stock.naver.com/front-api/v1/marketIndex/prices?category=exchange&reutersCode=FX_USDKRW"
-        r3 = requests.get(url, headers=HEADERS, timeout=5).json()
-        price = r3['result']['closePrice']
-        c_rate = r3['result']['fluctuationsRatio']
-        c_val = r3['result']['compareToPreviousClosePrice']
-        s3 = "▲" if float(c_val) > 0 else "▼" if float(c_val) < 0 else "-"
-        indicators["usd"] = f"{price}원 ({s3}{abs(float(c_rate)):.2f}%)"
-    except Exception: pass
+    for key, code in (("kospi", "KOSPI"), ("kosdaq", "KOSDAQ")):
+        try:
+            r = requests.get(f"https://m.stock.naver.com/api/index/{code}/basic", headers=HEADERS, timeout=5).json()
+            c = float(str(r['compareToPreviousClosePrice']).replace(',', ''))
+            s = "▲" if c > 0 else "▼" if c < 0 else "-"
+            indicators[key] = f"{r['closePrice']} ({s}{abs(float(r['fluctuationsRatio'])):.2f}%)"
+        except Exception as e:
+            print(f"  [{code}] 수집 실패: {e}")
+    indicators["usd"] = fetch_usd_krw()
     return indicators
 
+# ------------------------------------------------------------------------------
+# 🖼️ 4. 영상 디자인 및 텍스트 래핑
+# ------------------------------------------------------------------------------
 def wrap_pixels(text, font, max_w):
     lines, cur = [], ""
     for ch in text:
@@ -166,6 +269,9 @@ def get_circular_avatar(img_path, size=(300, 300)):
     except Exception:
         return None
 
+# ------------------------------------------------------------------------------
+# 🎬 5. 비디오 렌더링 코어
+# ------------------------------------------------------------------------------
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -355,10 +461,18 @@ def create_full_news_video_with_audio():
     print(f"동영상 렌더링 완료: {filename}")
     return filename, today_str
 
+# ------------------------------------------------------------------------------
+# 📧 6. 이메일 발송 (보안 강화: 환경변수 사용)
+# ------------------------------------------------------------------------------
 def send_email_with_video(video_path, receiver_email, today_str):
-    sender_email = "pmsung00@gmail.com"  
-    sender_password = "eurhztmevmaxlqki"
+    sender_email = "pmsung00@gmail.com"
+    # 보안 수정: 하드코딩된 비밀번호 삭제. 깃허브 Secrets에서 불러옵니다.
+    sender_password = os.environ.get('GMAIL_APP_PASSWORD')
     
+    if not sender_password:
+        print("⚠️ 깃허브 Secrets에 GMAIL_APP_PASSWORD가 없어 이메일을 보낼 수 없습니다.")
+        return
+
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
     msg['Subject'] = f"[박씨네 보험톡] {today_str} 요약뉴스"
@@ -379,7 +493,7 @@ def send_email_with_video(video_path, receiver_email, today_str):
     except Exception as e: print(f"이메일 발송 실패: {e}")
 
 # ------------------------------------------------------------------------------
-# 📺 6. 유튜브 자동 업로드 모듈 (박씨네 보험톡 원본 + 비공개 설정)
+# 📺 7. 유튜브 자동 업로드 (비공개 세팅)
 # ------------------------------------------------------------------------------
 def upload_to_youtube(video_path, today_str):
     print("유튜브 업로드를 시작합니다...")
