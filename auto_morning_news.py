@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 방송국 - 최종 마스터 (네이버 지표 수집 오류 해결 + 유튜브 비공개 세팅)
+# 박씨네 보험톡 방송국 - 최종 마스터 (네이버 지표 수정 + 뉴스 섞기 + 유튜브 비공개)
 # ==============================================================================
 
 import os
@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 import re
 import subprocess
 import requests
+import random  # 매일 뉴스가 똑같이 나오는 현상을 막기 위한 랜덤 섞기 기능 추가
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -33,8 +34,6 @@ HEADERS = {
     'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
     'Referer': 'https://m.stock.naver.com/'
 }
-
-# --- (이하 뉴스 수집 및 영상 제작 함수들은 기존 박씨네 보험톡 오리지널 100% 동일) ---
 
 def _run_ffmpeg(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -97,9 +96,16 @@ def fetch_one_top_news(keyword):
 
 def fetch_category_news(keywords_list):
     news_items = []
-    for keyword in keywords_list:
+    # 💡 핵심 수정: 매일 똑같은 첫 뉴스가 나오는 것을 막기 위해 검색어 순서를 무작위로 섞음
+    shuffled_keywords = random.sample(keywords_list, len(keywords_list))
+    
+    for keyword in shuffled_keywords:
         news = fetch_one_top_news(keyword)
-        if news: news_items.append(news)
+        if news:
+            # 💡 중복 뉴스 방지: 이미 수집된 뉴스 제목과 비슷한 경우 건너뜀
+            if not any(news.split('|')[0] in item for item in news_items):
+                news_items.append(news)
+    
     if not news_items:
         news_items.append("오늘의 주요 뉴스를 취합 중입니다.|[시스템]")
     return news_items
@@ -351,7 +357,7 @@ def create_full_news_video_with_audio():
 
 def send_email_with_video(video_path, receiver_email, today_str):
     sender_email = "pmsung00@gmail.com"  
-    sender_password = "eurhztmevmaxlqki" # 형의 구글 앱 비밀번호
+    sender_password = "eurhztmevmaxlqki"
     
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
@@ -396,7 +402,6 @@ def upload_to_youtube(video_path, today_str):
 
     youtube = build("youtube", "v3", credentials=creds)
     
-    # 박씨네 보험톡 원본 제목 및 설명 복구
     title = f"[{today_str}] 박씨네 보험톡 일일 주요뉴스 브리핑 (경제/건강/생활)"
     description = f"""안녕하십니까! 박씨네 보험톡입니다.
 오늘({today_str})의 핵심 뉴스와 경제 지표를 빠르게 브리핑해 드립니다.
@@ -417,7 +422,7 @@ def upload_to_youtube(video_path, today_str):
             "categoryId": "25"
         },
         "status": {
-            "privacyStatus": "private"  # 형이 요청하신 비공개(private) 세팅 완료!
+            "privacyStatus": "private"  # 비공개 세팅
         }
     }
 
@@ -432,6 +437,5 @@ def upload_to_youtube(video_path, today_str):
 if __name__ == "__main__":
     video_file, date_str = create_full_news_video_with_audio()
     send_email_with_video(video_file, "pmsung00@gmail.com", date_str)
-    # 깃허브 금고 열쇠를 이용한 유튜브 자동 업로드 실행!
     upload_to_youtube(video_file, date_str)
 # --- END OF CODE ---
