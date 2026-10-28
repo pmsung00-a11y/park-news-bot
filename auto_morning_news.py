@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (고화질 선명도 극대화 + 캐릭터 및 마지막장 완벽 수정)
+# 박씨네 보험톡 - 최종 마스터 (좌우 듀얼 캐릭터 + 균등 수직 배치 + 컴팩트 연락처 박스)
 # ==============================================================================
 
 import os
@@ -187,7 +187,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
-# --- 🎬 비디오 렌더링 (고화질 선명도 + 완벽 레이아웃) ---
+# --- 🎬 비디오 렌더링 ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -208,8 +208,8 @@ def create_full_news_video_with_audio():
     font_huge = load_font(True, 65)
     font_large = load_font(True, 38)
     font_title = load_font(True, 32)
-    font_card_title = load_font(True, 22)
-    font_pub = load_font(False, 16)
+    font_card_title = load_font(True, 21)
+    font_pub = load_font(False, 15)
     font_footer = load_font(True, 24)
 
     eco_data = fetch_economic_indicators()
@@ -226,14 +226,14 @@ def create_full_news_video_with_audio():
         return f"{intro} 첫 번째 뉴스는, {clean_news} 입니다. 화면의 다른 주요 소식들도 확인해 보십시오."
 
     news_database = [
-        {"category": "건강 · 보험 소식", "accent": (231, 76, 60), "bg": "bg_health", "char": "toktok", "items": health_news, "footer": "건강이 최고의 자산입니다!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
-        {"category": "부동산 · 경제 흐름", "accent": (46, 204, 113), "bg": "bg_estate", "char": "toksun", "items": econ_news, "footer": "안전한 자산 관리의 시작!", "script": make_short_script("부동산, 경제 흐름입니다.", econ_news)},
-        {"category": "국내외 금융 시황", "accent": (52, 152, 219), "bg": "bg_finance", "char": "toktok", "items": finance_news, "footer": "현명한 투자가 미래를 바꿉니다!", "script": make_short_script("금융 시황 브리핑입니다.", finance_news)},
-        {"category": "놓치면 아쉬운 꿀팁", "accent": (243, 156, 18), "bg": "bg_tip", "char": "toksun", "items": tip_news, "footer": "알아두면 돈이 되는 정보!", "script": make_short_script("놓치면 안 될 생활 꿀팁입니다.", tip_news)}
+        {"category": "건강 · 보험 소식", "accent": (231, 76, 60), "bg": "bg_health", "items": health_news, "footer": "건강이 최고의 자산입니다!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
+        {"category": "부동산 · 경제 흐름", "accent": (46, 204, 113), "bg": "bg_estate", "items": econ_news, "footer": "안전한 자산 관리의 시작!", "script": make_short_script("부동산, 경제 흐름입니다.", econ_news)},
+        {"category": "국내외 금융 시황", "accent": (52, 152, 219), "bg": "bg_finance", "items": finance_news, "footer": "현명한 투자가 미래를 바꿉니다!", "script": make_short_script("금융 시황 브리핑입니다.", finance_news)},
+        {"category": "놓치면 아쉬운 꿀팁", "accent": (243, 156, 18), "bg": "bg_tip", "items": tip_news, "footer": "알아두면 돈이 되는 정보!", "script": make_short_script("놓치면 안 될 생활 꿀팁입니다.", tip_news)}
     ]
 
     slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은, {today_str} 입니다."}]
-    for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg": cat["bg"], "char": cat["char"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
+    for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg": cat["bg"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
     slides_data.append({"type": "outro", "script": "보험이 궁금할 땐, 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 기분 좋은 하루 보내시길 바랍니다."})
 
     brand_yellow = (255, 215, 0, 255)
@@ -254,8 +254,8 @@ def create_full_news_video_with_audio():
             else:
                 slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
 
-            # 배경 투명도를 확실하게 내려서(어두운 오버레이 235) 글자가 확 돋보이게 처리
-            overlay_dark = Image.new("RGBA", (img_width, img_height), (12, 16, 25, 235))
+            # 배경 투명도 최적화 (오버레이 알파값 160)
+            overlay_dark = Image.new("RGBA", (img_width, img_height), (12, 16, 25, 160))
             slide = Image.alpha_composite(slide, overlay_dark)
 
         draw = ImageDraw.Draw(slide)
@@ -286,89 +286,98 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 1190), f"발행일 : {today_str}", fill=(200, 210, 230, 255), font=font_card_title, anchor="mm")
 
         elif data["type"] == "news":
-            draw.rectangle([0, 40, img_width, 50], fill=data["accent"])
+            draw.rectangle([0, 45, img_width, 55], fill=data["accent"])
             cat_w = draw.textlength(data['category'], font=font_title)
             title_box_w = cat_w + 70
             
             box_x1 = img_width//2 - title_box_w//2
-            box_y1 = 70
+            box_y1 = 75
             box_x2 = img_width//2 + title_box_w//2
-            box_y2 = 135
+            box_y2 = 140
             
-            draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 250), outline=data["accent"], width=2, radius=12)
-            draw.text((img_width//2, 102), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
+            draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
+            draw.text((img_width//2, 107), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 캐릭터 배치 (제목 바로 옆에 기대어 있는 모습, 크기 160px)
-            char_file = find_image(data["char"])
-            if char_file and os.path.exists(char_file):
+            # 좌측에 톡톡이, 우측에 톡순이 캐릭터 배치
+            toktok_file = find_image("toktok")
+            if toktok_file and os.path.exists(toktok_file):
                 try:
-                    char_img = Image.open(char_file).convert("RGBA")
-                    w_pct = (160 / float(char_img.size[1]))
-                    h_size = int((float(char_img.size[0]) * float(w_pct)))
-                    char_img = char_img.resize((h_size, 160), Image.Resampling.LANCZOS)
-                    slide.paste(char_img, (box_x2 - 10, box_y1 - 35), char_img)
+                    t_img = Image.open(toktok_file).convert("RGBA")
+                    t_pct = (130 / float(t_img.size[1]))
+                    t_w = int((float(t_img.size[0]) * float(t_pct)))
+                    t_img = t_img.resize((t_w, 130), Image.Resampling.LANCZOS)
+                    slide.paste(t_img, (box_x1 - t_w - 15, 65), t_img)
                 except: pass
 
-            # 뉴스 6개를 여유있게 배치하여 하단 공백 제거
-            start_y = 155
-            for item in data['items'][:6]:
+            toksun_file = find_image("toksun")
+            if toksun_file and os.path.exists(toksun_file):
+                try:
+                    s_img = Image.open(toksun_file).convert("RGBA")
+                    s_pct = (130 / float(s_img.size[1]))
+                    s_w = int((float(s_img.size[0]) * float(s_pct)))
+                    s_img = s_img.resize((s_w, 130), Image.Resampling.LANCZOS)
+                    slide.paste(s_img, (box_x2 + 15, 65), s_img)
+                except: pass
+
+            # 뉴스 6개를 화면 전체에 수직 균등 배분하여 공백 없이 꽉 찬 레이아웃 완성
+            start_y = 160
+            slot_h = (1120 - 160) / 6  # 총 가용 공간(160 ~ 1120)을 6등분
+            for i, item in enumerate(data['items'][:6]):
                 title, _, pub = item.rpartition('|') if '|' in item else (item, '', '')
                 wrapped = wrap_pixels(title, font_card_title, 570)
                 
-                card_h = len(wrapped) * 30 + 34
-                draw.rounded_rectangle([30, start_y, img_width - 30, start_y + card_h], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
+                card_h = len(wrapped) * 26 + 28
+                card_y = start_y + (i * slot_h) + (slot_h - card_h) / 2
                 
-                draw.rounded_rectangle([30, start_y, 40, start_y + card_h], fill=data["accent"], radius=12)
-                draw.rectangle([35, start_y, 40, start_y + card_h], fill=data["accent"])
+                draw.rounded_rectangle([30, card_y, img_width - 30, card_y + card_h], fill=(20, 28, 42, 235), outline=data["accent"], width=2, radius=12)
+                draw.rounded_rectangle([30, card_y, 40, card_y + card_h], fill=data["accent"], radius=12)
+                draw.rectangle([35, card_y, 40, card_y + card_h], fill=data["accent"])
 
-                text_y = start_y + 17
+                text_y = card_y + 14
                 for line in wrapped:
                     draw.text((60, text_y), line, fill=(245, 248, 255, 255), font=font_card_title, anchor="la")
-                    text_y += 30
+                    text_y += 26
                 
                 if pub:
                     pub = pub.replace('[', '').replace(']', '')
                     pub_w = draw.textlength(pub, font=font_pub)
                     pub_box_x = img_width - 45 - pub_w - 18
-                    pub_box_y = start_y + card_h - 26
-                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 20], fill=(40, 55, 80, 250), radius=5)
+                    pub_box_y = card_y + card_h - 24
+                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 18], fill=(40, 55, 80, 250), radius=5)
                     draw.text((pub_box_x + 8, pub_box_y + 1), pub, fill=(200, 215, 235, 255), font=font_pub, anchor="la")
-                
-                start_y += card_h + 10
             
-            draw.rounded_rectangle([60, 1175, img_width - 60, 1240], fill=(20, 28, 42, 245), outline=brand_yellow, width=2, radius=18)
-            draw.text((img_width//2, 1207), data["footer"], fill=brand_yellow, font=font_footer, anchor="mm")
+            draw.rounded_rectangle([60, 1150, img_width - 60, 1220], fill=(20, 28, 42, 240), outline=brand_yellow, width=2, radius=18)
+            draw.text((img_width//2, 1185), data["footer"], fill=brand_yellow, font=font_footer, anchor="mm")
 
         elif data["type"] == "outro":
             profile_file = find_image("profile")
             if profile_file:
-                avatar = get_circular_avatar(profile_file, (280, 280))
-                if avatar: slide.paste(avatar, (img_width//2 - 140, 100), avatar)
+                avatar = get_circular_avatar(profile_file, (240, 240))
+                if avatar: slide.paste(avatar, (img_width//2 - 120, 100), avatar)
                 
-            draw.text((img_width//2, 420), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
-            draw.text((img_width//2, 490), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
+            draw.text((img_width//2, 390), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
+            draw.text((img_width//2, 450), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            # 마지막 장: 전화, 카톡, 블로그 3가지 정보 + 이모티콘 상시 고정
-            dash_y = 590
-            draw.rounded_rectangle([50, dash_y, img_width - 50, dash_y + 500], fill=(20, 28, 42, 240), outline=(80, 95, 120, 255), width=2, radius=25)
+            # 마지막 장: 컴팩트 박스 (전화, 카톡, 블로그 완벽 포함)
+            dash_y = 530
+            draw.rounded_rectangle([60, dash_y, img_width - 60, dash_y + 360], fill=(20, 28, 42, 240), outline=(80, 95, 120, 255), width=2, radius=20)
             
             # 1. 전화 상담
-            draw.text((90, dash_y + 80), "📞 전화 상담", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 80), "010-2062-4600", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
-            draw.line([(90, dash_y + 145), (img_width-90, dash_y + 145)], fill=(60, 75, 100, 255), width=1)
+            draw.text((100, dash_y + 60), "📞 전화 상담", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, dash_y + 60), "010-2062-4600", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+            draw.line([(90, dash_y + 120), (img_width-90, dash_y + 120)], fill=(60, 75, 100, 255), width=1)
 
             # 2. 카카오톡
-            draw.text((90, dash_y + 210), "💬 카카오톡", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 210), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
-            draw.line([(90, dash_y + 275), (img_width-90, dash_y + 275)], fill=(60, 75, 100, 255), width=1)
+            draw.text((100, dash_y + 180), "💬 카카오톡", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, dash_y + 180), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+            draw.line([(90, dash_y + 240), (img_width-90, dash_y + 240)], fill=(60, 75, 100, 255), width=1)
 
-            # 3. 공식 블로그 (누락되었던 정보 완벽 복원)
-            draw.text((90, dash_y + 340), "🌐 공식 블로그", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 340), "insureeasy", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+            # 3. 공식 블로그
+            draw.text((100, dash_y + 300), "🌐 공식 블로그", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, dash_y + 300), "insureeasy", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
-            draw.text((img_width//2, dash_y + 430), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
-
-            draw.text((img_width//2, 1210), "박씨네 보험톡과 함께 든든한 하루를 시작하세요!", fill=(180, 190, 210, 255), font=font_card_title, anchor="mm")
+            draw.text((img_width//2, 1000), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
+            draw.text((img_width//2, 1180), "박씨네 보험톡과 함께 든든한 하루를 시작하세요!", fill=(180, 190, 210, 255), font=font_card_title, anchor="mm")
 
         slide = slide.convert("RGB")
         img_path = os.path.join(WORK_DIR, f"slide_{slide_no}.png")
@@ -396,8 +405,8 @@ def create_full_news_video_with_audio():
         clips.append(video_clip)
 
     final_video = concatenate_videoclips(clips, method="compose")
-    # 초고화질 렌더링 설정 (비트레이트 4000k, 24fps)
-    final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="4000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    # 초고화질 렌더링 설정 (비트레이트 5000k)
+    final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="5000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     return filename, today_str
 
 def upload_to_youtube(video_path, today_str):
