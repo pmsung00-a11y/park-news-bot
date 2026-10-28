@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 진짜 최종 마스터 (요일별 자동 인사말 템플릿 기능 추가)
+# 박씨네 보험톡 - 진짜 최종 마스터 (유튜브 자동 업로드 + 이메일 카톡 템플릿 발송)
 # ==============================================================================
 
 import os
@@ -33,7 +33,7 @@ HEADERS = {
     'Referer': 'https://m.stock.naver.com/'
 }
 
-MAX_AGE_HOURS = 36  
+MAX_AGE_HOURS = 36  # 36시간 지난 똑같은 뉴스 반복 방지
 
 def _run_ffmpeg(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -58,7 +58,7 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
         _run_ffmpeg(fb)
         return output_path
 
-# --- 뉴스 수집 ---
+# --- 📰 뉴스 수집 (최신순 정렬 및 중복 방지) ---
 def _split_title(title):
     publisher, news_title = "", title
     if ' - ' in title:
@@ -109,7 +109,7 @@ def fetch_category_news(keywords_list, max_items=8):
     if not picked: return ["오늘의 주요 뉴스를 취합 중입니다.|[시스템]"]
     return [f"{p['title']}|[{p['pub']}]" if p['pub'] else f"{p['title']}|" for p in picked]
 
-# --- 경제 지표 수집 ---
+# --- 📈 경제 지표 수집 (IP 차단 방지) ---
 def fetch_usd_krw():
     try:
         data = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5).json()
@@ -131,7 +131,7 @@ def fetch_economic_indicators():
     indicators["usd"] = fetch_usd_krw()
     return indicators
 
-# --- 영상 및 텍스트 유틸리티 ---
+# --- 🖼️ 영상 및 텍스트 유틸리티 ---
 def wrap_pixels(text, font, max_w):
     lines, cur = [], ""
     for ch in text:
@@ -159,7 +159,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
-# --- 비디오 렌더링 ---
+# --- 🎬 비디오 렌더링 ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -347,7 +347,7 @@ def create_full_news_video_with_audio():
     final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", bitrate="1000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     return filename, today_str
 
-# --- 💡 유튜브 업로드 함수 (링크를 리턴하도록 수정) ---
+# --- 💡 유튜브 자동 업로드 ---
 def upload_to_youtube(video_path, today_str):
     client_id = os.environ.get('YOUTUBE_CLIENT_ID')
     client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET')
@@ -392,20 +392,23 @@ def get_daily_greeting():
     ]
     return greetings[weekday]
 
-# --- 💡 이메일 자동 발송 (요일별 인사말 템플릿 적용) ---
+# --- 💡 이메일 자동 발송 (에러 추적기 및 요일 템플릿 적용) ---
 def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     sender_email = "pmsung00@gmail.com"
     sender_password = os.environ.get('GMAIL_APP_PASSWORD')
-    if not sender_password: return
+    
+    print("\n[이메일 발송 단계 시작]")
+    if not sender_password: 
+        print("❌ 실패 원인: 깃허브 환경변수(GMAIL_APP_PASSWORD)를 불러오지 못했습니다. .yml 파일을 꼭 확인해주세요.")
+        return
+    else:
+        print("✅ 비밀번호 환경변수 정상 인식 완료")
     
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
     msg['Subject'] = f"[박씨네 보험톡] {today_str} 주요뉴스 및 카톡 전송용 링크"
     
-    # 💡 요일별 인사말 불러오기
     daily_greeting = get_daily_greeting()
-    
-    # 💡 이메일 본문에 카카오톡 전송용 템플릿 세팅
     email_body = f"""형님! 오늘의 뉴스 영상 제작 및 유튜브 업로드가 완료되었습니다.
 아래의 [카톡 전송용 템플릿]을 그대로 복사해서 고객분들께 보내시면 됩니다!
 
@@ -424,6 +427,7 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     msg.attach(MIMEText(email_body, 'plain'))
     
     try:
+        print("첨부파일 읽는 중...")
         with open(video_path, "rb") as attachment:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment.read())
@@ -431,18 +435,21 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
         part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
         msg.attach(part)
         
+        print("구글 메일 서버(SMTP) 접속 중...")
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
         server.quit()
-    except: pass
+        print("🎉 이메일 발송 최종 성공!")
+    except Exception as e:
+        print(f"❌ 이메일 발송 중 에러 발생: {e}")
 
 if __name__ == "__main__":
     video_file, date_str = create_full_news_video_with_audio()
     
-    # 1. 유튜브에 영상을 올리고 링크를 받아옵니다.
+    # 유튜브에 영상을 올리고 링크를 받아옵니다.
     yt_link = upload_to_youtube(video_file, date_str)
     
-    # 2. 받아온 링크와 '요일별 인사말'을 조합하여 이메일로 쏩니다.
+    # 링크와 템플릿을 조합하여 이메일로 쏩니다.
     send_email_with_video(video_file, "pmsung00@gmail.com", date_str, yt_link)
 # --- END OF CODE ---
