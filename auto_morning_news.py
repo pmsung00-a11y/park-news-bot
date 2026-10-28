@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (일레븐랩스 + 앱 스타일 카드 뉴스 + 캐릭터 디자인)
+# 박씨네 보험톡 - 최종 마스터 (고화질 캔바 배경 + 톡톡이/톡순이 캐릭터 완벽 합성)
 # ==============================================================================
 
 import os
@@ -125,7 +125,7 @@ def fetch_fresh_candidates(keyword, per_keyword=3):
 
 def _norm(t): return re.sub(r'[^가-힣a-zA-Z0-9]', '', t)
 
-def fetch_category_news(keywords_list, max_items=6): # 모바일 가독성을 위해 한 페이지당 6개로 조정
+def fetch_category_news(keywords_list, max_items=5): 
     pool = []
     for kw in keywords_list: pool.extend(fetch_fresh_candidates(kw))
     pool.sort(key=lambda x: x["dt"], reverse=True)
@@ -187,7 +187,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
-# --- 🎬 비디오 렌더링 (디자인 개편) ---
+# --- 🎬 비디오 렌더링 (형님 맞춤 캔바 배경 + 캐릭터 합성) ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -208,8 +208,8 @@ def create_full_news_video_with_audio():
     font_huge = load_font(True, 65)
     font_large = load_font(True, 40)
     font_title = load_font(True, 34)
-    font_card_title = load_font(True, 24)
-    font_pub = load_font(False, 18)
+    font_card_title = load_font(True, 23)
+    font_pub = load_font(False, 17)
     font_footer = load_font(True, 26)
 
     eco_data = fetch_economic_indicators()
@@ -226,128 +226,140 @@ def create_full_news_video_with_audio():
         return f"{intro} 첫 번째 뉴스는, {clean_news} 입니다. 화면의 다른 주요 소식들도 확인해 보십시오."
 
     news_database = [
-        {"category": "건강 · 보험 소식", "accent": (231, 76, 60), "icon": "🏥", "items": health_news, "footer": "건강이 최고의 자산입니다!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
-        {"category": "부동산 · 경제 흐름", "accent": (46, 204, 113), "icon": "🏢", "items": econ_news, "footer": "안전한 자산 관리의 시작!", "script": make_short_script("부동산, 경제 흐름입니다.", econ_news)},
-        {"category": "국내외 금융 시황", "accent": (52, 152, 219), "icon": "📈", "items": finance_news, "footer": "현명한 투자가 미래를 바꿉니다!", "script": make_short_script("금융 시황 브리핑입니다.", finance_news)},
-        {"category": "놓치면 아쉬운 꿀팁", "accent": (243, 156, 18), "icon": "💡", "items": tip_news, "footer": "알아두면 돈이 되는 정보!", "script": make_short_script("놓치면 안 될 생활 꿀팁입니다.", tip_news)}
+        {"category": "건강 · 보험 소식", "accent": (231, 76, 60), "bg": "bg_health", "char": "toktok", "items": health_news, "footer": "건강이 최고의 자산입니다!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
+        {"category": "부동산 · 경제 흐름", "accent": (46, 204, 113), "bg": "bg_estate", "char": "toksun", "items": econ_news, "footer": "안전한 자산 관리의 시작!", "script": make_short_script("부동산, 경제 흐름입니다.", econ_news)},
+        {"category": "국내외 금융 시황", "accent": (52, 152, 219), "bg": "bg_finance", "char": "toktok", "items": finance_news, "footer": "현명한 투자가 미래를 바꿉니다!", "script": make_short_script("금융 시황 브리핑입니다.", finance_news)},
+        {"category": "놓치면 아쉬운 꿀팁", "accent": (243, 156, 18), "bg": "bg_tip", "char": "toksun", "items": tip_news, "footer": "알아두면 돈이 되는 정보!", "script": make_short_script("놓치면 안 될 생활 꿀팁입니다.", tip_news)}
     ]
 
     slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은, {today_str} 입니다."}]
-    for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
+    for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg": cat["bg"], "char": cat["char"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
     slides_data.append({"type": "outro", "script": "보험이 궁금할 땐, 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 기분 좋은 하루 보내시길 바랍니다."})
 
     brand_yellow = (255, 215, 0, 255)
-    bg_warm = (248, 249, 250, 255) # 아주 밝고 따뜻한 라이트 그레이/베이지 (앱 배경 느낌)
 
     clips = []
     for slide_no, data in enumerate(slides_data, start=1):
-        slide = Image.new("RGBA", (img_width, img_height), color=bg_warm)
+        # 1. 형님이 올리신 고화질 캔바 배경 이미지를 기본 슬라이드로 로드
+        bg_file = None
+        if data["type"] == "cover":
+            bg_file = find_image("bg_social") or find_image("bg_health") # 커버는 사회 또는 건강 배경 활용
+        elif data["type"] == "news":
+            bg_file = find_image(data["bg"])
+        elif data["type"] == "outro":
+            bg_file = find_image("bg_tip")
+
+        if bg_file and os.path.exists(bg_file):
+            try:
+                slide = Image.open(bg_file).convert("RGBA")
+                slide = ImageOps.fit(slide, (img_width, img_height), Image.Resampling.LANCZOS)
+            except:
+                slide = Image.new("RGBA", (img_width, img_height), color=(15, 20, 30, 255))
+        else:
+            slide = Image.new("RGBA", (img_width, img_height), color=(15, 20, 30, 255))
+
+        # 가독성을 살리기 위해 배경 위에 은은한 어두운 반투명 필터 얹기
+        overlay_dark = Image.new("RGBA", (img_width, img_height), (10, 15, 25, 140))
+        slide = Image.alpha_composite(slide, overlay_dark)
         draw = ImageDraw.Draw(slide)
 
         if data["type"] == "cover":
-            # 메인 커버: 노란색 테마와 프로필
-            draw.rectangle([0, 0, img_width, 600], fill=brand_yellow) # 상단 노란색 배경
-            
             profile_file = find_image("profile")
             if profile_file:
-                avatar = get_circular_avatar(profile_file, (320, 320))
-                if avatar: slide.paste(avatar, (img_width//2 - 160, 100), avatar)
+                avatar = get_circular_avatar(profile_file, (300, 300))
+                if avatar: slide.paste(avatar, (img_width//2 - 150, 120), avatar)
                 
-            draw.text((img_width//2, 480), "박씨네 보험톡", fill=(50, 50, 50, 255), font=font_huge, anchor="mm")
-            draw.text((img_width//2, 570), "일일 주요뉴스", fill=(0, 0, 0, 255), font=font_huge, anchor="mm")
+            draw.text((img_width//2, 480), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
+            draw.text((img_width//2, 560), "일일 주요뉴스", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            # 경제 지표 카드 (토스 앱 스타일)
-            dash_y = 700
-            draw.rounded_rectangle([40, dash_y, img_width - 40, dash_y + 400], fill=(255, 255, 255, 255), outline=(230, 230, 230, 255), width=2, radius=30)
-            draw.text((img_width//2, dash_y + 60), "오늘의 주요 경제 지표", fill=(50, 50, 50, 255), font=font_title, anchor="mm")
-            draw.line([(80, dash_y + 110), (img_width-80, dash_y + 110)], fill=(240, 240, 240, 255), width=2)
+            # 경제 지표 카드
+            dash_y = 660
+            draw.rounded_rectangle([40, dash_y, img_width - 40, dash_y + 420], fill=(20, 28, 42, 230), outline=(80, 95, 120, 255), width=2, radius=25)
+            draw.text((img_width//2, dash_y + 50), "〓 오늘의 주요 경제 지표 〓", fill=brand_yellow, font=font_title, anchor="mm")
+            draw.line([(80, dash_y + 95), (img_width-80, dash_y + 95)], fill=(80, 95, 120, 255), width=1)
             
-            draw.text((80, dash_y + 170), "📈 KOSPI", fill=(100, 100, 100, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 80, dash_y + 170), eco_data["kospi"], fill=(231, 76, 60, 255) if "▲" in eco_data["kospi"] else (52, 152, 219, 255), font=font_title, anchor="rm")
+            draw.text((80, dash_y + 160), "KOSPI", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 80, dash_y + 160), eco_data["kospi"], fill=(255, 100, 100, 255) if "▲" in eco_data["kospi"] else (100, 180, 255, 255), font=font_title, anchor="rm")
             
-            draw.text((80, dash_y + 250), "📉 KOSDAQ", fill=(100, 100, 100, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 80, dash_y + 250), eco_data["kosdaq"], fill=(231, 76, 60, 255) if "▲" in eco_data["kosdaq"] else (52, 152, 219, 255), font=font_title, anchor="rm")
+            draw.text((80, dash_y + 240), "KOSDAQ", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 80, dash_y + 240), eco_data["kosdaq"], fill=(255, 100, 100, 255) if "▲" in eco_data["kosdaq"] else (100, 180, 255, 255), font=font_title, anchor="rm")
             
-            draw.text((80, dash_y + 330), "💵 환율 (USD)", fill=(100, 100, 100, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 80, dash_y + 330), eco_data["usd"], fill=(50, 50, 50, 255), font=font_title, anchor="rm")
+            draw.text((80, dash_y + 320), "환율 (USD)", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 80, dash_y + 320), eco_data["usd"], fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
-            draw.text((img_width//2, 1180), f"발행일 : {today_str}", fill=(150, 150, 150, 255), font=font_card_title, anchor="mm")
+            draw.text((img_width//2, 1180), f"발행일 : {today_str}", fill=(200, 210, 230, 255), font=font_card_title, anchor="mm")
 
         elif data["type"] == "news":
-            # 헤더 디자인 (박씨네 노란색 라벨)
-            draw.rectangle([0, 0, img_width, 180], fill=brand_yellow)
-            draw.rounded_rectangle([40, 90, img_width - 40, 160], fill=(255, 255, 255, 255), radius=20)
-            draw.text((img_width//2, 125), data['category'], fill=(0, 0, 0, 255), font=font_large, anchor="mm")
+            # 상단 카테고리 배지 바
+            draw.rectangle([0, 50, img_width, 60], fill=data["accent"])
+            cat_w = draw.textlength(data['category'], font=font_title)
+            title_box_w = cat_w + 70
+            draw.rounded_rectangle([img_width//2 - title_box_w//2, 85, img_width//2 + title_box_w//2, 155], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
+            draw.text((img_width//2, 120), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 캐릭터 배치 (톡톡이 또는 톡순이가 있으면 헤더 우측에 귀엽게 빼꼼)
-            char_file = find_image("toktok") or find_image("toksun")
-            if char_file:
+            # 톡톡이 / 톡순이 캐릭터 합성 (우측 상단 앙증맞게 배치)
+            char_file = find_image(data["char"])
+            if char_file and os.path.exists(char_file):
                 try:
                     char_img = Image.open(char_file).convert("RGBA")
-                    # 캐릭터 크기를 비율에 맞게 조절 (높이 150px)
-                    w_pct = (150 / float(char_img.size[1]))
+                    w_pct = (130 / float(char_img.size[1]))
                     h_size = int((float(char_img.size[0]) * float(w_pct)))
-                    char_img = char_img.resize((h_size, 150), Image.Resampling.LANCZOS)
-                    slide.paste(char_img, (img_width - h_size - 20, 20), char_img)
+                    char_img = char_img.resize((h_size, 130), Image.Resampling.LANCZOS)
+                    slide.paste(char_img, (img_width - h_size - 25, 20), char_img)
                 except: pass
 
-            # 개별 뉴스 카드 그리기
-            start_y = 210
-            for item in data['items'][:6]: # 최대 6개 
+            # 개별 뉴스 카드 (가독성 극대화)
+            start_y = 185
+            for item in data['items'][:5]:
                 title, _, pub = item.rpartition('|') if '|' in item else (item, '', '')
-                wrapped = wrap_pixels(title, font_card_title, 550) # 텍스트 너비 조절
+                wrapped = wrap_pixels(title, font_card_title, 570)
                 
-                card_h = len(wrapped) * 35 + 45
-                # 하얀색 카드 배경
-                draw.rounded_rectangle([30, start_y, img_width - 30, start_y + card_h], fill=(255, 255, 255, 255), outline=(220, 220, 220, 255), width=2, radius=15)
+                card_h = len(wrapped) * 32 + 38
+                draw.rounded_rectangle([30, start_y, img_width - 30, start_y + card_h], fill=(20, 28, 42, 220), outline=data["accent"], width=2, radius=15)
                 
-                # 포인트 색상 왼쪽 띠
-                draw.rounded_rectangle([30, start_y, 40, start_y + card_h], fill=data["accent"]+(255,), radius=15)
-                # 띠의 오른쪽 둥근 모서리를 직각으로 덮기 (왼쪽만 둥글게)
-                draw.rectangle([35, start_y, 40, start_y + card_h], fill=data["accent"]+(255,))
+                # 왼쪽 포인트 바
+                draw.rounded_rectangle([30, start_y, 42, start_y + card_h], fill=data["accent"], radius=15)
+                draw.rectangle([36, start_y, 42, start_y + card_h], fill=data["accent"])
 
-                # 텍스트 쓰기
-                text_y = start_y + 22
+                # 뉴스 텍스트 출력
+                text_y = start_y + 18
                 for line in wrapped:
-                    draw.text((60, text_y), line, fill=(40, 40, 40, 255), font=font_card_title, anchor="la")
-                    text_y += 35
+                    draw.text((65, text_y), line, fill=(245, 248, 255, 255), font=font_card_title, anchor="la")
+                    text_y += 32
                 
-                # 우측 하단 언론사 배지 (토스 스타일)
+                # 언론사 배지
                 if pub:
                     pub = pub.replace('[', '').replace(']', '')
                     pub_w = draw.textlength(pub, font=font_pub)
                     pub_box_x = img_width - 45 - pub_w - 20
-                    pub_box_y = start_y + card_h - 35
-                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 25], fill=(240, 240, 240, 255), radius=8)
-                    draw.text((pub_box_x + 10, pub_box_y + 2), pub, fill=(120, 120, 120, 255), font=font_pub, anchor="la")
+                    pub_box_y = start_y + card_h - 28
+                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 22], fill=(40, 55, 80, 250), radius=6)
+                    draw.text((pub_box_x + 10, pub_box_y + 2), pub, fill=(200, 215, 235, 255), font=font_pub, anchor="la")
                 
-                start_y += card_h + 15
+                start_y += card_h + 12
             
-            # 말풍선 푸터 (톡순이 톤의 힐링 메시지)
-            draw.rounded_rectangle([80, 1150, img_width - 80, 1220], fill=(255, 255, 255, 255), outline=brand_yellow, width=3, radius=35)
-            draw.polygon([(img_width//2 - 10, 1150), (img_width//2 + 10, 1150), (img_width//2, 1130)], fill=brand_yellow)
-            draw.text((img_width//2, 1185), data["footer"], fill=(50, 50, 50, 255), font=font_footer, anchor="mm")
+            # 하단 푸터 말풍선
+            draw.rounded_rectangle([60, 1150, img_width - 60, 1220], fill=(20, 28, 42, 230), outline=brand_yellow, width=2, radius=20)
+            draw.text((img_width//2, 1185), data["footer"], fill=brand_yellow, font=font_footer, anchor="mm")
 
         elif data["type"] == "outro":
-            draw.rectangle([0, 0, img_width, img_height], fill=brand_yellow)
-            
             profile_file = find_image("profile")
             if profile_file:
-                avatar = get_circular_avatar(profile_file, (340, 340))
-                if avatar: slide.paste(avatar, (img_width//2 - 170, 200), avatar)
+                avatar = get_circular_avatar(profile_file, (300, 300))
+                if avatar: slide.paste(avatar, (img_width//2 - 150, 160), avatar)
                 
-            draw.text((img_width//2, 600), "보험이 궁금할 땐?", fill=(50, 50, 50, 255), font=font_large, anchor="mm")
-            draw.text((img_width//2, 680), "박씨네 보험톡", fill=(0, 0, 0, 255), font=font_huge, anchor="mm")
+            draw.text((img_width//2, 530), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
+            draw.text((img_width//2, 605), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            draw.rounded_rectangle([80, 800, img_width - 80, 1050], fill=(255, 255, 255, 255), radius=30)
+            draw.rounded_rectangle([60, 720, img_width - 60, 980], fill=(20, 28, 42, 230), outline=(80, 95, 120, 255), width=2, radius=25)
             
-            draw.text((120, 860), "📞 전화 상담", fill=(100, 100, 100, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 120, 860), "010-2062-4600", fill=(50, 50, 50, 255), font=font_title, anchor="rm")
+            draw.text((100, 790), "📞 전화 상담", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, 790), "010-2062-4600", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
             
-            draw.text((120, 940), "💬 카카오톡", fill=(100, 100, 100, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 120, 940), "PMSUNGOO", fill=(50, 50, 50, 255), font=font_title, anchor="rm")
+            draw.text((100, 880), "💬 카카오톡", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, 880), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
-            draw.text((img_width//2, 1180), "오늘도 기분 좋은 하루 보내세요!", fill=(50, 50, 50, 255), font=font_large, anchor="mm")
+            draw.text((img_width//2, 1130), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
 
         slide = slide.convert("RGB")
         img_path = os.path.join(WORK_DIR, f"slide_{slide_no}.png")
