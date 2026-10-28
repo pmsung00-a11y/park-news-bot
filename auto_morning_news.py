@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (고화질 캔바 배경 + 톡톡이/톡순이 캐릭터 완벽 합성)
+# 박씨네 보험톡 - 최종 마스터 (고화질 선명도 업그레이드 + 캐릭터 레이아웃 개편)
 # ==============================================================================
 
 import os
@@ -125,7 +125,7 @@ def fetch_fresh_candidates(keyword, per_keyword=3):
 
 def _norm(t): return re.sub(r'[^가-힣a-zA-Z0-9]', '', t)
 
-def fetch_category_news(keywords_list, max_items=5): 
+def fetch_category_news(keywords_list, max_items=6): # 6개로 늘려서 하단 공백 완전 제거
     pool = []
     for kw in keywords_list: pool.extend(fetch_fresh_candidates(kw))
     pool.sort(key=lambda x: x["dt"], reverse=True)
@@ -187,7 +187,7 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
-# --- 🎬 비디오 렌더링 (형님 맞춤 캔바 배경 + 캐릭터 합성) ---
+# --- 🎬 비디오 렌더링 (해상도 업 + 배경 투명도 조절 + 캐릭터 배치 최적화) ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -208,9 +208,9 @@ def create_full_news_video_with_audio():
     font_huge = load_font(True, 65)
     font_large = load_font(True, 40)
     font_title = load_font(True, 34)
-    font_card_title = load_font(True, 23)
-    font_pub = load_font(False, 17)
-    font_footer = load_font(True, 26)
+    font_card_title = load_font(True, 21) # 6개 카드를 예쁘게 담기 위한 최적 폰트 크기
+    font_pub = load_font(False, 16)
+    font_footer = load_font(True, 24)
 
     eco_data = fetch_economic_indicators()
 
@@ -237,30 +237,29 @@ def create_full_news_video_with_audio():
     slides_data.append({"type": "outro", "script": "보험이 궁금할 땐, 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 기분 좋은 하루 보내시길 바랍니다."})
 
     brand_yellow = (255, 215, 0, 255)
+    dark_bg = (15, 20, 30, 255) # 표지와 뒷장을 위한 기존 다크 네이비 단색
 
     clips = []
     for slide_no, data in enumerate(slides_data, start=1):
-        # 1. 형님이 올리신 고화질 캔바 배경 이미지를 기본 슬라이드로 로드
-        bg_file = None
-        if data["type"] == "cover":
-            bg_file = find_image("bg_social") or find_image("bg_health") # 커버는 사회 또는 건강 배경 활용
-        elif data["type"] == "news":
-            bg_file = find_image(data["bg"])
-        elif data["type"] == "outro":
-            bg_file = find_image("bg_tip")
-
-        if bg_file and os.path.exists(bg_file):
-            try:
-                slide = Image.open(bg_file).convert("RGBA")
-                slide = ImageOps.fit(slide, (img_width, img_height), Image.Resampling.LANCZOS)
-            except:
-                slide = Image.new("RGBA", (img_width, img_height), color=(15, 20, 30, 255))
+        if data["type"] in ["cover", "outro"]:
+            # 3. 표지와 뒷장은 배경이미지 없이 기존 다크 톤 유지
+            slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
         else:
-            slide = Image.new("RGBA", (img_width, img_height), color=(15, 20, 30, 255))
+            # 뉴스 슬라이드: 형님이 만드신 배경 이미지 로드
+            bg_file = find_image(data["bg"])
+            if bg_file and os.path.exists(bg_file):
+                try:
+                    slide = Image.open(bg_file).convert("RGBA")
+                    slide = ImageOps.fit(slide, (img_width, img_height), Image.Resampling.LANCZOS)
+                except:
+                    slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
+            else:
+                slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
 
-        # 가독성을 살리기 위해 배경 위에 은은한 어두운 반투명 필터 얹기
-        overlay_dark = Image.new("RGBA", (img_width, img_height), (10, 15, 25, 140))
-        slide = Image.alpha_composite(slide, overlay_dark)
+            # 1. 배경 투명도를 더 높여서(어두운 필터를 진하게) 뉴스 글자가 훨씬 확 돋보이도록 조정
+            overlay_dark = Image.new("RGBA", (img_width, img_height), (12, 16, 25, 205))
+            slide = Image.alpha_composite(slide, overlay_dark)
+
         draw = ImageDraw.Draw(slide)
 
         if data["type"] == "cover":
@@ -272,7 +271,6 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 480), "박씨네 보험톡", fill=(255, 255, 255, 255), font=font_huge, anchor="mm")
             draw.text((img_width//2, 560), "일일 주요뉴스", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            # 경제 지표 카드
             dash_y = 660
             draw.rounded_rectangle([40, dash_y, img_width - 40, dash_y + 420], fill=(20, 28, 42, 230), outline=(80, 95, 120, 255), width=2, radius=25)
             draw.text((img_width//2, dash_y + 50), "〓 오늘의 주요 경제 지표 〓", fill=brand_yellow, font=font_title, anchor="mm")
@@ -291,56 +289,65 @@ def create_full_news_video_with_audio():
 
         elif data["type"] == "news":
             # 상단 카테고리 배지 바
-            draw.rectangle([0, 50, img_width, 60], fill=data["accent"])
+            draw.rectangle([0, 45, img_width, 55], fill=data["accent"])
             cat_w = draw.textlength(data['category'], font=font_title)
             title_box_w = cat_w + 70
-            draw.rounded_rectangle([img_width//2 - title_box_w//2, 85, img_width//2 + title_box_w//2, 155], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
-            draw.text((img_width//2, 120), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 톡톡이 / 톡순이 캐릭터 합성 (우측 상단 앙증맞게 배치)
+            box_x1 = img_width//2 - title_box_w//2
+            box_y1 = 80
+            box_x2 = img_width//2 + title_box_w//2
+            box_y2 = 145
+            
+            draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 245), outline=data["accent"], width=2, radius=12)
+            draw.text((img_width//2, 112), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
+            
+            # 2. 톡톡이, 톡순이를 제목 바로 옆(우측)에 더 크고 귀엽게 기대어 있는 모습으로 배치
             char_file = find_image(data["char"])
             if char_file and os.path.exists(char_file):
                 try:
                     char_img = Image.open(char_file).convert("RGBA")
-                    w_pct = (130 / float(char_img.size[1]))
+                    # 크기를 키워서(높이 160px) 제목 옆에 찰싹 붙이기
+                    w_pct = (160 / float(char_img.size[1]))
                     h_size = int((float(char_img.size[0]) * float(w_pct)))
-                    char_img = char_img.resize((h_size, 130), Image.Resampling.LANCZOS)
-                    slide.paste(char_img, (img_width - h_size - 25, 20), char_img)
+                    char_img = char_img.resize((h_size, 160), Image.Resampling.LANCZOS)
+                    
+                    # 배지 박스 우측(box_x2) 바로 옆에 살짝 걸치듯 배치
+                    slide.paste(char_img, (box_x2 - 10, box_y1 - 35), char_img)
                 except: pass
 
-            # 개별 뉴스 카드 (가독성 극대화)
-            start_y = 185
-            for item in data['items'][:5]:
+            # 4. 6개의 뉴스를 촘촘하게 배치하여 하단 공백 완전 제거
+            start_y = 165
+            for item in data['items'][:6]:
                 title, _, pub = item.rpartition('|') if '|' in item else (item, '', '')
                 wrapped = wrap_pixels(title, font_card_title, 570)
                 
-                card_h = len(wrapped) * 32 + 38
-                draw.rounded_rectangle([30, start_y, img_width - 30, start_y + card_h], fill=(20, 28, 42, 220), outline=data["accent"], width=2, radius=15)
+                card_h = len(wrapped) * 28 + 32
+                draw.rounded_rectangle([30, start_y, img_width - 30, start_y + card_h], fill=(20, 28, 42, 235), outline=data["accent"], width=2, radius=12)
                 
                 # 왼쪽 포인트 바
-                draw.rounded_rectangle([30, start_y, 42, start_y + card_h], fill=data["accent"], radius=15)
-                draw.rectangle([36, start_y, 42, start_y + card_h], fill=data["accent"])
+                draw.rounded_rectangle([30, start_y, 40, start_y + card_h], fill=data["accent"], radius=12)
+                draw.rectangle([35, start_y, 40, start_y + card_h], fill=data["accent"])
 
                 # 뉴스 텍스트 출력
-                text_y = start_y + 18
+                text_y = start_y + 16
                 for line in wrapped:
-                    draw.text((65, text_y), line, fill=(245, 248, 255, 255), font=font_card_title, anchor="la")
-                    text_y += 32
+                    draw.text((60, text_y), line, fill=(245, 248, 255, 255), font=font_card_title, anchor="la")
+                    text_y += 28
                 
                 # 언론사 배지
                 if pub:
                     pub = pub.replace('[', '').replace(']', '')
                     pub_w = draw.textlength(pub, font=font_pub)
-                    pub_box_x = img_width - 45 - pub_w - 20
-                    pub_box_y = start_y + card_h - 28
-                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 22], fill=(40, 55, 80, 250), radius=6)
-                    draw.text((pub_box_x + 10, pub_box_y + 2), pub, fill=(200, 215, 235, 255), font=font_pub, anchor="la")
+                    pub_box_x = img_width - 45 - pub_w - 18
+                    pub_box_y = start_y + card_h - 26
+                    draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 45, pub_box_y + 20], fill=(40, 55, 80, 250), radius=5)
+                    draw.text((pub_box_x + 8, pub_box_y + 1), pub, fill=(200, 215, 235, 255), font=font_pub, anchor="la")
                 
-                start_y += card_h + 12
+                start_y += card_h + 8
             
             # 하단 푸터 말풍선
-            draw.rounded_rectangle([60, 1150, img_width - 60, 1220], fill=(20, 28, 42, 230), outline=brand_yellow, width=2, radius=20)
-            draw.text((img_width//2, 1185), data["footer"], fill=brand_yellow, font=font_footer, anchor="mm")
+            draw.rounded_rectangle([60, 1170, img_width - 60, 1235], fill=(20, 28, 42, 240), outline=brand_yellow, width=2, radius=18)
+            draw.text((img_width//2, 1202), data["footer"], fill=brand_yellow, font=font_footer, anchor="mm")
 
         elif data["type"] == "outro":
             profile_file = find_image("profile")
@@ -387,7 +394,8 @@ def create_full_news_video_with_audio():
         clips.append(video_clip)
 
     final_video = concatenate_videoclips(clips, method="compose")
-    final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", bitrate="1000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    # 5. 해상도 및 화질 대폭 상향 (비트레이트 2500k로 고화질 렌더링)
+    final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="2500k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     return filename, today_str
 
 def upload_to_youtube(video_path, today_str):
@@ -460,4 +468,4 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
 if __name__ == "__main__":
     video_file, date_str = create_full_news_video_with_audio()
     yt_link = upload_to_youtube(video_file, date_str)
-    send_email_with_video(video_file, "pmsung00@gmail.com", date_str, yt_link)
+    send_email_with_video(video_file, "pnsung00@gmail.com", date_str, yt_link)
