@@ -254,7 +254,6 @@ def create_full_news_video_with_audio():
             else:
                 slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
 
-            # 배경 투명도를 더 높여서(어두운 필터를 진하게) 뉴스 글자가 훨씬 확 돋보이도록 조정
             overlay_dark = Image.new("RGBA", (img_width, img_height), (12, 16, 25, 215))
             slide = Image.alpha_composite(slide, overlay_dark)
 
@@ -298,7 +297,6 @@ def create_full_news_video_with_audio():
             draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 245), outline=data["accent"], width=2, radius=12)
             draw.text((img_width//2, 112), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 캐릭터를 제목 바로 옆에 더 크고 귀엽게 배치
             char_file = find_image(data["char"])
             if char_file and os.path.exists(char_file):
                 try:
@@ -350,3 +348,110 @@ def create_full_news_video_with_audio():
             draw.rounded_rectangle([60, 720, img_width - 60, 980], fill=(20, 28, 42, 230), outline=(80, 95, 120, 255), width=2, radius=25)
             
             draw.text((100, 790), "📞 전화 상담", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, 790), "010-2062-4600", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+            
+            draw.text((100, 880), "💬 카카오톡", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
+            draw.text((img_width - 100, 880), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+
+            draw.text((img_width//2, 1130), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
+
+        slide = slide.convert("RGB")
+        img_path = os.path.join(WORK_DIR, f"slide_{slide_no}.png")
+        slide.save(img_path)
+        
+        audio_path = os.path.join(WORK_DIR, f"audio_{slide_no}.mp3")
+        
+        try:
+            print(f"[{slide_no}번 슬라이드] 일레븐랩스(형님 목소리) 음성 생성 시도...")
+            generate_elevenlabs_audio(data["script"], audio_path)
+            final_audio = AudioFileClip(audio_path)
+        except Exception as e:
+            print(f"⚠️ 일레븐랩스 실패, gTTS 전환: {e}")
+            tts = gTTS(text=data["script"], lang="ko")
+            tts.save(audio_path)
+            fast_audio_path = os.path.join(WORK_DIR, f"fast_audio_{slide_no}.wav")
+            voice_clip_path = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.4)
+            final_audio = AudioFileClip(voice_clip_path)
+
+        try:
+            img_clip = ImageClip(img_path).set_duration(final_audio.duration)
+            video_clip = img_clip.set_audio(final_audio)
+        except:
+            video_clip = ImageClip(img_path).set_duration(6.0)
+        clips.append(video_clip)
+
+    final_video = concatenate_videoclips(clips, method="compose")
+    final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="2500k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
+    return filename, today_str
+
+def upload_to_youtube(video_path, today_str):
+    client_id = os.environ.get('YOUTUBE_CLIENT_ID')
+    client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET')
+    refresh_token = os.environ.get('YOUTUBE_REFRESH_TOKEN')
+    
+    if not all([client_id, client_secret, refresh_token]): 
+        return None
+
+    creds = Credentials(None, refresh_token=refresh_token, token_uri="https://oauth2.googleapis.com/token", client_id=client_id, client_secret=client_secret)
+    youtube = build("youtube", "v3", credentials=creds)
+    
+    body = {
+        "snippet": {
+            "title": f"[{today_str}] 박씨네 보험톡 일일 주요뉴스 브리핑 (경제/건강/생활)",
+            "description": f"안녕하십니까! 박씨네 보험톡입니다.\n오늘({today_str})의 핵심 뉴스를 브리핑해 드립니다.\n\n📞 010-2062-4600\n💬 카카오톡: PMSUNGOO",
+            "tags": ["박씨네보험톡", "보험뉴스", "경제뉴스", "건강보험", "오늘의뉴스"],
+            "categoryId": "25"
+        },
+        "status": {"privacyStatus": "private"}
+    }
+    try:
+        media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
+        response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
+        return f"https://youtu.be/{response['id']}"
+    except: 
+        return None
+
+def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
+    sender_email = "pmsung00@gmail.com"
+    sender_password = os.environ.get('GMAIL_APP_PASSWORD')
+    
+    if not sender_password: return
+    
+    msg = MIMEMultipart()
+    msg['From'], msg['To'] = sender_email, receiver_email
+    msg['Subject'] = f"[박씨네 보험톡] {today_str} 주요뉴스 및 카톡 전송용 링크"
+    
+    email_body = f"""형님! 오늘의 뉴스 영상이 완성되었습니다.
+아래 링크를 복사해서 카카오톡으로 고객님들께 전송해 주십시오!
+
+↓↓↓↓↓ [여기서부터 복사] ↓↓↓↓↓
+
+활기찬 아침입니다! 고객님의 든든한 파트너 박씨네 보험톡입니다.
+오늘({today_str}) 놓치지 말아야 할 2분 핵심 뉴스를 준비했습니다.
+
+▶️ 오늘의 영상 보기 : {youtube_link if youtube_link else '유튜브 업로드 지연'}
+
+바쁜 출근길, 유익한 정보 챙겨가시고 오늘 하루도 기분 좋은 일만 가득하시길 진심으로 응원합니다. 늘 감사합니다!
+
+↑↑↑↑↑ [여기까지 복사] ↑↑↑↑↑
+"""
+    msg.attach(MIMEText(email_body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('video', 'mp4')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename={urllib.parse.quote(os.path.basename(video_path))}")
+        msg.attach(part)
+        
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+    except: pass
+
+if __name__ == "__main__":
+    video_file, date_str = create_full_news_video_with_audio()
+    yt_link = upload_to_youtube(video_file, date_str)
+    send_email_with_video(video_file, "pmsung00@gmail.com", date_str, yt_link)
