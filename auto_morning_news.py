@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (캐릭터 20% 확대 & 대칭 완벽 정렬 + 블로그 풀주소)
+# 박씨네 보험톡 - 최종 마스터 (발행일 노란색 + 캐릭터 완벽 대칭 + 마지막 장 컴팩트)
 # ==============================================================================
 
 import os
@@ -210,7 +210,7 @@ def create_full_news_video_with_audio():
     font_huge = load_font(True, 65)
     font_large = load_font(True, 38)
     font_title = load_font(True, 32)
-    font_card_title = load_font(True, 30) # 글자 30으로 유지
+    font_card_title = load_font(True, 30) # 글자 크기 30 유지
     font_pub = load_font(True, 16)
     font_footer = load_font(True, 24)
 
@@ -284,12 +284,12 @@ def create_full_news_video_with_audio():
             draw.text((80, dash_y + 330), "환율 (USD)", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
             draw.text((img_width - 80, dash_y + 330), eco_data["usd"], fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
-            draw.text((img_width//2, 1190), f"발행일 : {today_str}", fill=(200, 210, 230, 255), font=font_card_title, anchor="mm")
+            # 3. 첫장 발행일 글자 색상을 흰색에서 노란색(brand_yellow)으로 변경하여 가독성 업!
+            draw.text((img_width//2, 1190), f"발행일 : {today_str}", fill=brand_yellow, font=font_footer, anchor="mm")
 
         elif data["type"] == "news":
-            draw.rectangle([0, 45, img_width, 55], fill=data["accent"])
-            cat_w = draw.textlength(data['category'], font=font_title)
-            title_box_w = int(cat_w + 70)
+            # 2. 제목 박스 가로 크기(340px)를 무조건 고정하여 양옆 캐릭터가 완벽하게 대칭되게 만듦
+            title_box_w = 340
             
             box_x1 = int(img_width//2 - title_box_w//2)
             box_y1 = 70
@@ -299,9 +299,9 @@ def create_full_news_video_with_audio():
             draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
             draw.text((img_width//2, 102), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 1. 캐릭터 크기 20% 확대(높이 190px) 및 제목 박스 기준 완벽한 좌우 대칭(간격 25px) 정렬
+            # 캐릭터 크기 190px & 정확히 좌우 데칼코마니 배치 (제목 박스에서 정확히 동일 간격)
             char_height = 190
-            gap_from_box = 25
+            gap_from_box = 10
             
             toktok_file = find_image("toktok")
             if toktok_file and os.path.exists(toktok_file):
@@ -310,7 +310,7 @@ def create_full_news_video_with_audio():
                     t_pct = (char_height / float(t_img.size[1]))
                     t_w = int((float(t_img.size[0]) * float(t_pct)))
                     t_img = t_img.resize((t_w, char_height), Image.Resampling.LANCZOS)
-                    # 제목 박스 왼쪽 테두리(box_x1)에서 gap_from_box 만큼 떨어진 위치
+                    # 왼쪽 배치
                     slide.paste(t_img, (int(box_x1 - gap_from_box - t_w), int(box_y1 - 65)), t_img)
                 except Exception as e: print("톡톡이 로드 에러:", e)
 
@@ -321,7 +321,7 @@ def create_full_news_video_with_audio():
                     s_pct = (char_height / float(s_img.size[1]))
                     s_w = int((float(s_img.size[0]) * float(s_pct)))
                     s_img = s_img.resize((s_w, char_height), Image.Resampling.LANCZOS)
-                    # 제목 박스 오른쪽 테두리(box_x2)에서 gap_from_box 만큼 떨어진 위치
+                    # 오른쪽 배치
                     slide.paste(s_img, (int(box_x2 + gap_from_box), int(box_y1 - 65)), s_img)
                 except Exception as e: print("톡순이 로드 에러:", e)
 
@@ -364,23 +364,29 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 350), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
             draw.text((img_width//2, 410), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            dash_y = 480
-            draw.rounded_rectangle([50, dash_y, img_width - 50, dash_y + 360], fill=(20, 28, 42, 240), outline=(80, 95, 120, 255), width=2, radius=20)
+            # 1. 마지막 장 정보 작게, 박스 작게, 완벽한 정렬! (글자 크기 22px 적용)
+            font_outro_small = load_font(True, 22)
+            dash_y = 500
+            box_w = 580
+            o_x1 = int(img_width//2 - box_w//2)
+            o_x2 = int(img_width//2 + box_w//2)
             
-            draw.text((90, dash_y + 60), "▶ 전화 상담", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 60), "010-2062-4600", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
-            draw.line([(80, dash_y + 120), (img_width-80, dash_y + 120)], fill=(60, 75, 100, 255), width=1)
+            # 박스 세로 길이도 컴팩트하게 조절
+            draw.rounded_rectangle([o_x1, dash_y, o_x2, dash_y + 310], fill=(20, 28, 42, 240), outline=(80, 95, 120, 255), width=2, radius=20)
+            
+            draw.text((o_x1 + 35, dash_y + 60), "▶ 전화 상담", fill=(200, 215, 235, 255), font=font_outro_small, anchor="lm")
+            draw.text((o_x2 - 35, dash_y + 60), "010-2062-4600", fill=(255, 255, 255, 255), font=font_outro_small, anchor="rm")
+            draw.line([(o_x1 + 25, dash_y + 110), (o_x2 - 25, dash_y + 110)], fill=(60, 75, 100, 255), width=1)
 
-            draw.text((90, dash_y + 180), "▶ 카카오톡", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 180), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
-            draw.line([(80, dash_y + 240), (img_width-80, dash_y + 240)], fill=(60, 75, 100, 255), width=1)
+            draw.text((o_x1 + 35, dash_y + 160), "▶ 카카오톡", fill=(200, 215, 235, 255), font=font_outro_small, anchor="lm")
+            draw.text((o_x2 - 35, dash_y + 160), "PMSUNGOO", fill=(255, 255, 255, 255), font=font_outro_small, anchor="rm")
+            draw.line([(o_x1 + 25, dash_y + 210), (o_x2 - 25, dash_y + 210)], fill=(60, 75, 100, 255), width=1)
 
-            # 2. 공식 블로그 주소 완벽하게 풀네임으로 복원!
-            draw.text((90, dash_y + 300), "▶ 공식 블로그", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
-            draw.text((img_width - 90, dash_y + 300), "blog.naver.com/insureeasy", fill=(255, 255, 255, 255), font=font_title, anchor="rm")
+            draw.text((o_x1 + 35, dash_y + 260), "▶ 공식 블로그", fill=(200, 215, 235, 255), font=font_outro_small, anchor="lm")
+            draw.text((o_x2 - 35, dash_y + 260), "blog.naver.com/insureeasy", fill=(255, 255, 255, 255), font=font_outro_small, anchor="rm")
 
-            draw.text((img_width//2, 910), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
-            draw.text((img_width//2, 1180), "박씨네 보험톡과 함께 든든한 하루를 시작하세요!", fill=(180, 190, 210, 255), font=font_card_title, anchor="mm")
+            draw.text((img_width//2, 880), "오늘도 기분 좋은 하루 보내세요!", fill=brand_yellow, font=font_title, anchor="mm")
+            draw.text((img_width//2, 1180), "박씨네 보험톡과 함께 든든한 하루를 시작하세요!", fill=(180, 190, 210, 255), font=font_footer, anchor="mm")
 
         slide = slide.convert("RGB")
         img_path = os.path.join(WORK_DIR, f"slide_{slide_no}.png")
