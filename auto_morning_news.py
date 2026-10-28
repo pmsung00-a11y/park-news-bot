@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 진짜 최종 마스터 (깃허브 IP 차단 방지 환율 + 시간순 정렬 뉴스)
+# 박씨네 보험톡 - 진짜 최종 마스터 (요일별 자동 인사말 템플릿 기능 추가)
 # ==============================================================================
 
 import os
@@ -33,7 +33,7 @@ HEADERS = {
     'Referer': 'https://m.stock.naver.com/'
 }
 
-MAX_AGE_HOURS = 36  # 36시간 지난 똑같은 뉴스 반복 방지
+MAX_AGE_HOURS = 36  
 
 def _run_ffmpeg(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -58,7 +58,7 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
         _run_ffmpeg(fb)
         return output_path
 
-# --- 뉴스 수집 (클로드 로직 반영) ---
+# --- 뉴스 수집 ---
 def _split_title(title):
     publisher, news_title = "", title
     if ' - ' in title:
@@ -109,10 +109,9 @@ def fetch_category_news(keywords_list, max_items=8):
     if not picked: return ["오늘의 주요 뉴스를 취합 중입니다.|[시스템]"]
     return [f"{p['title']}|[{p['pub']}]" if p['pub'] else f"{p['title']}|" for p in picked]
 
-# --- 경제 지표 수집 (깃허브 IP 친화적 오픈 API 적용) ---
+# --- 경제 지표 수집 ---
 def fetch_usd_krw():
     try:
-        # 깃허브 서버에서도 절대 막히지 않는 개방형 API를 1순위로 사용합니다.
         data = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5).json()
         price = float(data['rates']['KRW'])
         return f"{price:,.2f}원 (-)"
@@ -348,33 +347,14 @@ def create_full_news_video_with_audio():
     final_video.write_videofile(filename, fps=10, preset="ultrafast", threads=4, codec="libx264", bitrate="1000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     return filename, today_str
 
-# --- 이메일 및 유튜브 업로드 ---
-def send_email_with_video(video_path, receiver_email, today_str):
-    sender_email = "pmsung00@gmail.com"
-    sender_password = os.environ.get('GMAIL_APP_PASSWORD')
-    if not sender_password: return
-    msg = MIMEMultipart()
-    msg['From'], msg['To'] = sender_email, receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {today_str} 요약뉴스"
-    msg.attach(MIMEText(f"{today_str} 박씨네 보험톡 일일 주요뉴스 영상을 첨부합니다.", 'plain'))
-    try:
-        with open(video_path, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
-        msg.attach(part)
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
-        server.quit()
-    except: pass
-
+# --- 💡 유튜브 업로드 함수 (링크를 리턴하도록 수정) ---
 def upload_to_youtube(video_path, today_str):
     client_id = os.environ.get('YOUTUBE_CLIENT_ID')
     client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET')
     refresh_token = os.environ.get('YOUTUBE_REFRESH_TOKEN')
-    if not all([client_id, client_secret, refresh_token]): return
+    
+    if not all([client_id, client_secret, refresh_token]): 
+        return None
 
     creds = Credentials(None, refresh_token=refresh_token, token_uri="https://oauth2.googleapis.com/token", client_id=client_id, client_secret=client_secret)
     youtube = build("youtube", "v3", credentials=creds)
@@ -390,10 +370,79 @@ def upload_to_youtube(video_path, today_str):
     }
     try:
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
-        youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
+        response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
+        return f"https://youtu.be/{response['id']}"
+    except: 
+        return None
+
+# --- 💡 요일별 멘트 생성 함수 ---
+def get_daily_greeting():
+    korea_timezone_offset = datetime.timedelta(hours=9)
+    now = datetime.datetime.utcnow() + korea_timezone_offset
+    weekday = now.weekday() # 0: 월요일 ~ 6: 일요일
+
+    greetings = [
+        "활기찬 월요일 아침입니다! 주말의 에너지를 듬뿍 받아 이번 주도 힘차게 시작하시길 응원합니다. 💪", # 월
+        "화창한 화요일입니다! 어제보다 더 환하게 웃을 수 있는 기분 좋은 하루 보내시길 바랍니다. 😊", # 화
+        "한 주의 절반을 달려온 수요일입니다! 조금은 지칠 수 있지만, 따뜻한 차 한 잔의 여유를 꼭 챙기세요. ☕", # 수
+        "든든한 목요일 아침입니다! 목표를 향해 꾸준히 나아가는 고객님의 오늘을 진심으로 응원합니다. 🏃‍♂️", # 목
+        "기다리던 금요일입니다! 오늘 하루만 더 힘내시면 즐거운 주말이 기다리고 있으니, 마지막까지 화이팅입니다! 🎉", # 금
+        "여유로운 토요일 아침입니다! 평일의 무거운 짐은 잠시 내려놓고, 사랑하는 사람들과 편안한 주말 보내세요. 🌿", # 토
+        "편안한 일요일입니다! 몸과 마음을 푹 쉬어주며, 다가올 새로운 한 주를 상쾌하게 준비하시는 하루 되시길 바랍니다. ☀️" # 일
+    ]
+    return greetings[weekday]
+
+# --- 💡 이메일 자동 발송 (요일별 인사말 템플릿 적용) ---
+def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
+    sender_email = "pmsung00@gmail.com"
+    sender_password = os.environ.get('GMAIL_APP_PASSWORD')
+    if not sender_password: return
+    
+    msg = MIMEMultipart()
+    msg['From'], msg['To'] = sender_email, receiver_email
+    msg['Subject'] = f"[박씨네 보험톡] {today_str} 주요뉴스 및 카톡 전송용 링크"
+    
+    # 💡 요일별 인사말 불러오기
+    daily_greeting = get_daily_greeting()
+    
+    # 💡 이메일 본문에 카카오톡 전송용 템플릿 세팅
+    email_body = f"""형님! 오늘의 뉴스 영상 제작 및 유튜브 업로드가 완료되었습니다.
+아래의 [카톡 전송용 템플릿]을 그대로 복사해서 고객분들께 보내시면 됩니다!
+
+--------------------------------------------------
+[박씨네 보험톡 오늘의 뉴스 💌]
+
+{daily_greeting}
+
+바쁜 아침, 핵심만 담은 3분 영상으로 유익한 정보 챙겨가시고,
+오늘 하루도 기분 좋은 일만 가득하시기를 진심으로 바랍니다. 
+늘 감사합니다!
+
+▶️ 오늘의 영상 확인하기 : {youtube_link if youtube_link else '유튜브 업로드 지연 (첨부파일을 확인해 주세요)'}
+--------------------------------------------------
+"""
+    msg.attach(MIMEText(email_body, 'plain'))
+    
+    try:
+        with open(video_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(video_path)}")
+        msg.attach(part)
+        
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
     except: pass
 
 if __name__ == "__main__":
     video_file, date_str = create_full_news_video_with_audio()
-    send_email_with_video(video_file, "pmsung00@gmail.com", date_str)
-    upload_to_youtube(video_file, date_str)
+    
+    # 1. 유튜브에 영상을 올리고 링크를 받아옵니다.
+    yt_link = upload_to_youtube(video_file, date_str)
+    
+    # 2. 받아온 링크와 '요일별 인사말'을 조합하여 이메일로 쏩니다.
+    send_email_with_video(video_file, "pmsung00@gmail.com", date_str, yt_link)
+# --- END OF CODE ---
