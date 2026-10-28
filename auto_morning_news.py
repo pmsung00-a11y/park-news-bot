@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (파일명 변경 + 카톡 복사 템플릿 강화 + 이메일 첨부파일 수정)
+# 박씨네 보험톡 - 최종 마스터 (일레븐랩스 형님 목소리 탑재 + 에러 방어 로직)
 # ==============================================================================
 
 import os
@@ -11,6 +11,7 @@ import re
 import subprocess
 import requests
 import difflib
+import time
 from email.utils import parsedate_to_datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -58,6 +59,38 @@ def speedup_audio_ffmpeg(input_path, output_path, speed=1.4):
         _run_ffmpeg(fb)
         return output_path
 
+# --- 🎤 일레븐랩스(형님 목소리) 생성 함수 ---
+def generate_elevenlabs_audio(text, output_path):
+    api_key = os.environ.get('ELEVENLABS_API_KEY')
+    voice_id = os.environ.get('ELEVENLABS_VOICE_ID')
+    
+    if not api_key or not voice_id:
+        raise ValueError("깃허브 금고에 일레븐랩스 열쇠가 없습니다.")
+        
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": api_key
+    }
+    data = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2", # 한국어를 가장 자연스럽게 읽는 모델
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75
+        }
+    }
+    
+    response = requests.post(url, json=data, headers=headers, timeout=30)
+    response.raise_for_status()
+    
+    with open(output_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+
+# --- 📰 뉴스 및 지표 수집 ---
 def _split_title(title):
     publisher, news_title = "", title
     if ' - ' in title:
@@ -113,9 +146,7 @@ def fetch_usd_krw():
         data = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5).json()
         price = float(data['rates']['KRW'])
         return f"{price:,.2f}원 (-)"
-    except Exception as e:
-        print(f"환율 수집 실패: {e}")
-        return "수집 실패"
+    except: return "수집 실패"
 
 def fetch_economic_indicators():
     indicators = {"kospi": "수집 실패", "kosdaq": "수집 실패", "usd": "수집 실패"}
@@ -125,7 +156,7 @@ def fetch_economic_indicators():
             c = float(str(r['compareToPreviousClosePrice']).replace(',', ''))
             s = "▲" if c > 0 else "▼" if c < 0 else "-"
             indicators[key] = f"{r['closePrice']} ({s}{abs(float(r['fluctuationsRatio'])):.2f}%)"
-        except Exception: pass
+        except: pass
     indicators["usd"] = fetch_usd_krw()
     return indicators
 
@@ -156,12 +187,12 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
+# --- 🎬 비디오 렌더링 ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
     today_str = today_dt.strftime("%Y년 %m월 %d일")
     
-    # 💡 형님이 요청하신 파일명 형식으로 변경 완료!
     filename = f"일일 2분요약뉴스_{today_dt.strftime('%Y%m%d')}.mp4"
     img_width, img_height = 720, 1280
     
@@ -197,19 +228,19 @@ def create_full_news_video_with_audio():
         first_news = re.sub(r'^\d+\.\s*', '', first_news)
         clean_news = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', first_news)
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
-        return f"{intro} 오늘 주목할 첫 번째 뉴스는 {clean_news}입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
+        return f"{intro} 오늘 주목할 첫 번째 뉴스는, {clean_news} 입니다. 그 외 화면의 주요 소식들도 확인해 보십시오."
 
     news_database = [
-        {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요!", "script": make_short_script("건강 보험 소식입니다.", health_news)},
-        {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요!", "script": make_short_script("부동산 경제 소식입니다.", econ_news)},
+        {"category": "건강 · 보험 뉴스", "accent": (52, 152, 219), "bg_keyword": "bg_health", "items": health_news, "footer": "오늘도 건강하고 활기찬 하루 보내세요!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
+        {"category": "부동산 경제 뉴스", "accent": (46, 204, 113), "bg_keyword": "bg_estate", "items": econ_news, "footer": "당신의 소중한 자산, 든든하게 지켜드릴게요!", "script": make_short_script("부동산, 경제 소식입니다.", econ_news)},
         {"category": "국내외 금융 뉴스", "accent": (243, 156, 18), "bg_keyword": "bg_finance", "items": finance_news, "footer": "현명한 금융 습관이 밝은 미래를 만듭니다!", "script": make_short_script("국내외 금융 소식입니다.", finance_news)},
         {"category": "주요 사회 뉴스", "accent": (155, 89, 182), "bg_keyword": "bg_social", "items": social_news, "footer": "세상을 밝히는 따뜻한 소식이 더 많아지길!", "script": make_short_script("오늘의 주요 사회 소식입니다.", social_news)},
         {"category": "알뜰 상식 뉴스", "accent": (231, 76, 60), "bg_keyword": "bg_tip", "items": tip_news, "footer": "작은 상식 하나가 모여 큰 지혜가 됩니다!", "script": make_short_script("놓치면 안 될 생활 상식입니다.", tip_news)}
     ]
 
-    slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은 {today_str}입니다."}]
+    slides_data = [{"type": "cover", "script": f"안녕하십니까, 박씨네 보험톡 일일 주요뉴스입니다. 오늘 발행일은, {today_str} 입니다."}]
     for cat in news_database: slides_data.append({"type": "news", "category": cat["category"], "accent": cat["accent"], "bg_keyword": cat["bg_keyword"], "items": cat["items"], "footer": cat["footer"], "script": cat["script"]})
-    slides_data.append({"type": "outro", "script": "보험이 궁금할 땐 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 응원합니다."})
+    slides_data.append({"type": "outro", "script": "보험이 궁금할 땐, 언제든지 박씨네 보험톡을 찾아주세요. 오늘도 행복한 하루 보내시길 응원합니다."})
 
     clips = []
     for slide_no, data in enumerate(slides_data, start=1):
@@ -328,12 +359,23 @@ def create_full_news_video_with_audio():
         slide.save(img_path)
         
         audio_path = os.path.join(WORK_DIR, f"audio_{slide_no}.mp3")
-        fast_audio_path = os.path.join(WORK_DIR, f"fast_audio_{slide_no}.wav")
+        
+        # 💡 핵심 방어 로직: 일레븐랩스로 형님 목소리 시도, 실패 시 gTTS 기계음으로 알아서 대타!
         try:
+            print(f"[{slide_no}번 슬라이드] 일레븐랩스(형님 목소리) 음성 생성 시도...")
+            generate_elevenlabs_audio(data["script"], audio_path)
+            # 형님 본연의 목소리를 위해 속도 조절(speedup) 없이 원본 속도로 병합
+            final_audio = AudioFileClip(audio_path)
+            print(f"[{slide_no}번 슬라이드] 형님 목소리 적용 완료!")
+        except Exception as e:
+            print(f"⚠️ 일레븐랩스 실패, gTTS로 비상 전환합니다. (사유: {e})")
             tts = gTTS(text=data["script"], lang="ko")
             tts.save(audio_path)
+            fast_audio_path = os.path.join(WORK_DIR, f"fast_audio_{slide_no}.wav")
             voice_clip_path = speedup_audio_ffmpeg(audio_path, fast_audio_path, speed=1.4)
             final_audio = AudioFileClip(voice_clip_path)
+
+        try:
             img_clip = ImageClip(img_path).set_duration(final_audio.duration)
             video_clip = img_clip.set_audio(final_audio)
         except:
@@ -395,8 +437,6 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     if not sender_password: 
         print("❌ 실패 원인: 깃허브 환경변수(GMAIL_APP_PASSWORD)를 불러오지 못했습니다. .yml 파일을 꼭 확인해주세요.")
         return
-    else:
-        print("✅ 비밀번호 환경변수 정상 인식 완료")
     
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
@@ -404,7 +444,6 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     
     daily_greeting = get_daily_greeting()
     
-    # 💡 형님이 요청하신 템플릿 영역 시각적 강화!
     email_body = f"""형님! 오늘의 뉴스 영상 제작 및 유튜브 업로드가 완료되었습니다.
 아래 화살표 안쪽의 내용만 쏙 복사해서 카톡으로 보내시면 됩니다!
 
@@ -423,16 +462,13 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     msg.attach(MIMEText(email_body, 'plain'))
     
     try:
-        print("첨부파일 읽는 중...")
         with open(video_path, "rb") as attachment:
-            # 💡 두 개로 나뉘어 보이던 첨부파일 현상을 방지하기 위해 파일 속성을 비디오(mp4)로 정확히 지정
             part = MIMEBase('video', 'mp4')
             part.set_payload(attachment.read())
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', f"attachment; filename={urllib.parse.quote(os.path.basename(video_path))}")
         msg.attach(part)
         
-        print("구글 메일 서버(SMTP) 접속 중...")
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
