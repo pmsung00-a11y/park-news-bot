@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (캐릭터 양끝 강제 대칭 고정 + 마지막장 20% 축소)
+# 박씨네 보험톡 - 최종 마스터 (투명여백 자동제거로 캐릭터 완벽 대칭 달성)
 # ==============================================================================
 
 import os
@@ -189,6 +189,16 @@ def get_circular_avatar(img_path, size=(300, 300)):
         return output
     except: return None
 
+# --- ✨ 새롭게 추가된 핵심 기능: 투명 여백 자동 제거 ---
+def crop_transparent(img):
+    try:
+        # 알파 채널(투명도)을 기준으로 투명한 빈 공간을 완벽히 계산해서 잘라냅니다!
+        bbox = img.split()[-1].getbbox()
+        if bbox:
+            return img.crop(bbox)
+    except: pass
+    return img
+
 # --- 🎬 비디오 렌더링 ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
@@ -296,29 +306,31 @@ def create_full_news_video_with_audio():
             draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
             draw.text((img_width//2, 102), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 1. 톡톡이 톡순이 화면 양끝 강제 고정으로 완벽한 데칼코마니 밸런스 달성!
+            # 투명 여백 제거 후 양옆 35px 가장자리에서 고정 정렬!
             char_height = 190
             
             toktok_file = find_image("toktok")
             if toktok_file and os.path.exists(toktok_file):
                 try:
                     t_img = Image.open(toktok_file).convert("RGBA")
+                    t_img = crop_transparent(t_img) # 투명 여백 칼같이 자르기!
                     t_pct = (char_height / float(t_img.size[1]))
                     t_w = int((float(t_img.size[0]) * float(t_pct)))
                     t_img = t_img.resize((t_w, char_height), Image.Resampling.LANCZOS)
-                    # 왼쪽 화면 끝에서 40px 고정 위치
-                    slide.paste(t_img, (40, int(box_y1 - 65)), t_img)
+                    # 왼쪽 화면 끝에서 35px 위치에 완벽 고정
+                    slide.paste(t_img, (35, int(box_y1 - 65)), t_img)
                 except: pass
 
             toksun_file = find_image("toksun")
             if toksun_file and os.path.exists(toksun_file):
                 try:
                     s_img = Image.open(toksun_file).convert("RGBA")
+                    s_img = crop_transparent(s_img) # 투명 여백 칼같이 자르기!
                     s_pct = (char_height / float(s_img.size[1]))
                     s_w = int((float(s_img.size[0]) * float(s_pct)))
                     s_img = s_img.resize((s_w, char_height), Image.Resampling.LANCZOS)
-                    # 오른쪽 화면 끝에서 이미지 너비만큼 빼고 40px 고정 위치
-                    slide.paste(s_img, (img_width - s_w - 40, int(box_y1 - 65)), s_img)
+                    # 오른쪽 화면 끝에서 이미지 너비 빼고 35px 위치에 완벽 고정
+                    slide.paste(s_img, (img_width - s_w - 35, int(box_y1 - 65)), s_img)
                 except: pass
 
             start_y = 150
@@ -360,7 +372,7 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 350), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
             draw.text((img_width//2, 410), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            # 2. 마지막 장 컴팩트 박스 (가로세로 20% 축소 및 폰트 19px 적용)
+            # 마지막 장 정보 컴팩트 박스
             font_outro_small = load_font(True, 19)
             dash_y = 520
             box_w = 480
