@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (사회뉴스 복구 및 마지막장 블로그 잘림 해결)
+# 박씨네 보험톡 - 최종 마스터 (디자인 완벽 고정 + 꿀팁 상식뉴스 키워드 최적화)
 # ==============================================================================
 
 import os
@@ -216,18 +216,19 @@ def create_full_news_video_with_audio():
     font_huge = load_font(True, 65)
     font_large = load_font(True, 38)
     font_title = load_font(True, 32)
-    font_card_title = load_font(True, 30) # 글자 크기 30 유지
+    font_card_title = load_font(True, 30)
     font_pub = load_font(True, 16)
     font_footer = load_font(True, 24)
 
     eco_data = fetch_economic_indicators()
 
-    # [수정 1] 날아갔던 사회 뉴스 완벽 복구
     health_news = fetch_category_news(["건강보험공단", "실손보험 청구", "요양병원 정책", "비급여 진료"])
     econ_news = fetch_category_news(["서울 아파트값", "전세 대출", "한국은행 금리", "부동산 PF"])
     finance_news = fetch_category_news(["코스피 마감", "미국 증시", "원달러 환율", "금융 당국"])
     social_news = fetch_category_news(["사건 사고", "사회 이슈", "교육 정책", "지역 뉴스"]) 
-    tip_news = fetch_category_news(["정부 지원금", "소상공인 지원", "절세 방법", "청년 혜택"])
+    
+    # [수정] 꿀팁 상식뉴스: 겹침 방지를 위해 오직 실생활 꿀팁, 노하우, 상식 위주의 키워드로 완전히 교체!
+    tip_news = fetch_category_news(["생활 꿀팁", "살림 노하우", "생활 정보", "유용한 상식", "생활비 절약"])
 
     def make_short_script(intro, news_list):
         first_news = news_list[0].split('|')[0]
@@ -235,7 +236,6 @@ def create_full_news_video_with_audio():
         clean_news = re.sub(r'\s+', ' ', clean_news).strip()
         return f"{intro} 첫 번째 뉴스는, {clean_news} 입니다. 화면의 다른 주요 소식들도 확인해 보십시오."
 
-    # 5개의 카테고리 모두 정상적으로 렌더링되도록 리스트에 복구
     news_database = [
         {"category": "건강 · 보험 소식", "accent": (231, 76, 60), "bg": "bg_health", "items": health_news, "footer": "건강이 최고의 자산입니다!", "script": make_short_script("건강, 보험 소식입니다.", health_news)},
         {"category": "부동산 · 경제 흐름", "accent": (46, 204, 113), "bg": "bg_estate", "items": econ_news, "footer": "안전한 자산 관리의 시작!", "script": make_short_script("부동산, 경제 흐름입니다.", econ_news)},
@@ -266,7 +266,6 @@ def create_full_news_video_with_audio():
             else:
                 slide = Image.new("RGBA", (img_width, img_height), color=dark_bg)
 
-            # 배경 투명도 210 유지 (글씨 돋보이게)
             overlay_dark = Image.new("RGBA", (img_width, img_height), (12, 16, 25, 210))
             slide = Image.alpha_composite(slide, overlay_dark)
 
@@ -295,7 +294,6 @@ def create_full_news_video_with_audio():
             draw.text((80, dash_y + 330), "환율 (USD)", fill=(200, 215, 235, 255), font=font_card_title, anchor="lm")
             draw.text((img_width - 80, dash_y + 330), eco_data["usd"], fill=(255, 255, 255, 255), font=font_title, anchor="rm")
 
-            # 첫장 발행일 글자 색상 노란색 유지
             draw.text((img_width//2, 1190), f"발행일 : {today_str}", fill=brand_yellow, font=font_footer, anchor="mm")
 
         elif data["type"] == "news":
@@ -308,7 +306,6 @@ def create_full_news_video_with_audio():
             draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], fill=(20, 28, 42, 240), outline=data["accent"], width=2, radius=12)
             draw.text((img_width//2, 102), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
-            # 투명 여백 제거 후 양옆 35px 가장자리에서 고정 정렬 유지 (대칭 고정)
             char_height = 190
             
             toktok_file = find_image("toktok")
@@ -357,7 +354,6 @@ def create_full_news_video_with_audio():
                     pub_box_x = int(img_width - 35 - pub_w - 20)
                     pub_box_y = int(card_y + card_h + 3)
                     
-                    # 출처 완전 검정 바탕에 흰색 글씨 유지
                     draw.rounded_rectangle([pub_box_x, pub_box_y, img_width - 30, pub_box_y + 22], fill=(0, 0, 0, 255), radius=6)
                     draw.text((pub_box_x + 10, pub_box_y + 3), pub, fill=(255, 255, 255, 255), font=font_pub, anchor="la")
             
@@ -373,10 +369,9 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 350), "보험이 궁금할 땐?", fill=(220, 230, 245, 255), font=font_large, anchor="mm")
             draw.text((img_width//2, 410), "박씨네 보험톡", fill=brand_yellow, font=font_huge, anchor="mm")
             
-            # [수정 2] 마지막 장 컴팩트 박스 가로 너비만 글자가 잘리지 않도록 살짝 키움 (480 -> 540)
             font_outro_small = load_font(True, 19)
             dash_y = 520
-            box_w = 540  # 긴 주소가 잘리지 않도록 안전한 폭 확보
+            box_w = 540  
             box_h = 240
             o_x1 = int(img_width//2 - box_w//2)
             o_x2 = int(img_width//2 + box_w//2)
