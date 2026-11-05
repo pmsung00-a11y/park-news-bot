@@ -25,7 +25,7 @@ def collect_insurance_news():
             feed = feedparser.parse(url)
             
             for entry in feed.entries:
-                # 발행일 파싱 (파싱 실패 시 현재 시간 대체)
+                # 발행일 파싱
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     pub_date = datetime(*entry.published_parsed[:6])
                 elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
@@ -39,13 +39,14 @@ def collect_insurance_news():
                     link = entry.link.strip()
                     summary = getattr(entry, 'summary', title).strip()
                     
+                    # 괄호 짝 오류 수정 완료 부분
                     collected_articles.append({
                         "source": source_name,
                         "title": title,
                         "link": link,
                         "date": pub_date.strftime("%Y-%m-%d"),
                         "summary": summary
-                    }
+                    })
             print(f" -> {source_name}: {len(feed.entries)}개 중 최근 기사 필터링 완료")
         except Exception as e:
             print(f" [오류 발생] {source_name} 수집 실패: {e}")
