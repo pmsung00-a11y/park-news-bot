@@ -4,7 +4,7 @@ import textwrap
 from PIL import Image, ImageOps
 import numpy as np
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip, TextClip
-from moviepy.video.fx.all import crop, fadein, crossfadein
+from moviepy.video.fx.all import crop, fadein
 
 # --- 작업 폴더 설정 ---
 WORK_DIR = "radio_work"
