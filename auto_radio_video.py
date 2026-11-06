@@ -4,7 +4,7 @@ import textwrap
 from PIL import Image, ImageOps
 import numpy as np
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip, TextClip
-from moviepy.video.fx.all import crop, fadein
+from moviepy.video.fx.all import fadein
 
 # --- 작업 폴더 설정 ---
 WORK_DIR = "radio_work"
@@ -22,7 +22,7 @@ VOICE_MAPPING = {
     "수호": "ZJCNdZEjYwkOElxugmW2"
 }
 
-# --- 대본 및 씬(배경 이미지) 매칭 데이터 (총 78컷 중 일부 예시, 실제로는 전체 다 넣어주세요) ---
+# --- 2. 대본 및 씬(배경 이미지) 매칭 데이터 (총 78컷) ---
 radio_scenes = [
     {"no": 1, "speaker": "소영", "img": "img_thumb.png", "script": "기막힌 보험사연 라디오. 300만원 합의의 치명적인 함정, 지금 시작합니다."},
     {"no": 2, "speaker": "중현", "img": "img_scene_1.png", "script": "여보, 방금 보험사에서 전화 왔어. 합의금 제안이 왔는데 300만원이래."},
@@ -61,7 +61,7 @@ radio_scenes = [
     {"no": 35, "speaker": "중현", "img": "img_scene_6.png", "script": "그냥 우리 건강보험으로 한번 가봐요. 많이 아파?"},
     {"no": 36, "speaker": "순이", "img": "img_scene_6.png", "script": "어. 어지럼증도 있고. 자다가 팔이 저려서 깨기도 하고."},
     {"no": 37, "speaker": "소영", "img": "img_scene_7.png", "script": "병원에서 MRI를 찍었습니다. 그리고 결과를 들었어요."},
-    {"no": 38, "speaker": "문수", "img": "img_scene_7.png", "script": "경추 사번, 오번 사이에 디스크가 심하게 눌려 있어요. 신경을 압박하고 있는 상태인데, 이게 교통사고 충격으로 악화된 거거든요. 수술을 고려하셔야 할 것 같아요."},
+    {"no": 38, "speaker": "문수", "img": "img_scene_7.png", "script": "경추 사번, 오번 사이에 디스크가 심하게 눌려 있어요. 신경을 압박하고 있는 상태인데, 이게 교통사고 충격으로 악화된 거거든요. 수술을 고려하셔야 할 거 같아요."},
     {"no": 39, "speaker": "순이", "img": "img_scene_7.png", "script": "수술이요?"},
     {"no": 40, "speaker": "문수", "img": "img_scene_7.png", "script": "네. 지금 상태 계속 두면 팔 감각이 더 나빠질 수 있어요."},
     {"no": 41, "speaker": "순이", "img": "img_scene_7.png", "script": "근데 저 6개월 전에 교통사고로 합의 끝냈거든요. 그것 때문인 거 맞죠?"},
@@ -105,9 +105,9 @@ radio_scenes = [
 ]
 
 def generate_elevenlabs_audio(text, output_path, speaker):
-    """ElevenLabs API 호출: 화자에 맞는 보이스 ID 사용"""
+    """ElevenLabs API 호출 (화자에 맞는 보이스 ID 사용)"""
     api_key = os.environ.get('ELEVENLABS_API_KEY')
-    voice_id = VOICE_MAPPING.get(speaker, os.environ.get('ELEVENLABS_VOICE_ID', 'j9UrvurLWeTchpuBcUAg'))
+    voice_id = VOICE_MAPPING.get(speaker, os.environ.get('ELEVENLABS_VOICE_ID', 'lxYfHSkYm1EzQzGhdbfc'))
     
     if not api_key:
         print(f"⚠️ 경고: ELEVENLABS_API_KEY 없음. ({speaker} 더빙 스킵)")
@@ -140,8 +140,8 @@ def generate_elevenlabs_audio(text, output_path, speaker):
     except Exception as e:
         print(f"ElevenLabs 요청 중 에러 발생 ({speaker}): {e}")
 
-# 3D 카메라 줌 인 효과 함수 (이미지가 서서히 커지는 느낌)
-def zoom_in_effect(clip, zoom_ratio=1.05):
+def zoom_in_effect(clip, zoom_ratio=1.03):
+    """카메라가 아주 서서히 다가가는 줌 인 무빙 효과 (Pillow 기반으로 안전하게 처리)"""
     def effect(get_frame, t):
         scale = 1.0 + (zoom_ratio - 1.0) * (t / clip.duration)
         img = Image.fromarray(get_frame(t))
@@ -170,28 +170,28 @@ def create_radio_broadcast_video():
         script = data["script"]
         print(f"▶ [{scene_no:02d}/{len(radio_scenes)}] 화자: {speaker} | 대사: {script[:15]}...")
         
-        # 1. 16:9 이미지 워터마크 제거 (하단 잘라내기)
+        # 1. 원본 이미지 불러와서 Pillow로 안전하게 크롭/리사이즈 (Moviepy 오류 방지)
         img_path = os.path.join(ASSET_DIR, data["img"])
         if os.path.exists(img_path):
             img = Image.open(img_path).convert("RGB")
+            # 1920x1080 비율 꽉 채우기
             img = ImageOps.fit(img, (img_width, img_height), Image.Resampling.LANCZOS)
-            processed_img_path = os.path.join(WORK_DIR, f"slide_{scene_no}.png")
-            img.save(processed_img_path)
-            
-            img_clip = ImageClip(processed_img_path)
-            img_clip = crop(img_clip, y1=0, y2=1050) # 하단 워터마크 영역 30px 자르기
-            img_clip = img_clip.resize(height=1080)  # 다시 1080으로 꽉 채우기
+            # 워터마크 제거 (하단 30픽셀 잘라내기 -> 1920x1050)
+            img = img.crop((0, 0, img_width, img_height - 30))
+            # 다시 1920x1080으로 원상 복구 (Moviepy의 ANTIALIAS 에러 원천 차단)
+            img = img.resize((img_width, img_height), Image.Resampling.LANCZOS)
         else:
             img = Image.new("RGB", (img_width, img_height), color=(30, 30, 35))
-            processed_img_path = os.path.join(WORK_DIR, f"slide_{scene_no}.png")
-            img.save(processed_img_path)
-            img_clip = ImageClip(processed_img_path)
+            
+        processed_img_path = os.path.join(WORK_DIR, f"slide_{scene_no}.png")
+        img.save(processed_img_path)
+        img_clip = ImageClip(processed_img_path)
         
-        # 2. 오디오 생성 및 길이 측정
+        # 2. 오디오 생성 및 길이 설정
         audio_path = os.path.join(WORK_DIR, f"audio_{scene_no}.mp3")
         generate_elevenlabs_audio(script, audio_path, speaker)
         
-        duration = 4.0 # 오디오 실패 시 기본 길이
+        duration = 4.0 
         if os.path.exists(audio_path):
             try:
                 final_audio = AudioFileClip(audio_path)
@@ -201,31 +201,21 @@ def create_radio_broadcast_video():
         
         img_clip = img_clip.set_duration(duration)
         
-        # 3. 카메라 무빙(줌 인) 및 디졸브(장면 전환) 효과
-        img_clip = zoom_in_effect(img_clip, zoom_ratio=1.03) # 아주 서서히 카메라가 다가가는 효과
-        
+        # 3. 줌 인 효과 및 장면 전환(Fade in)
+        img_clip = zoom_in_effect(img_clip, zoom_ratio=1.03) 
         if data["img"] != prev_img and len(clips) > 0:
-            # 배경 이미지가 바뀌면 자연스럽게 서서히 나타나는(Fade in) 효과
-            img_clip = fadein(img_clip, 0.6)
-            
+            img_clip = fadein(img_clip, 0.6) # 이미지가 바뀔 때만 부드럽게 나타남
         prev_img = data["img"]
         
-        # 4. 하단 말풍선(자막) 합성 (MoviePy TextClip 활용)
+        # 4. 하단 자막(말풍선) 추가
         try:
-            # 긴 대사를 40글자씩 줄바꿈
             wrapped_text = "\n".join(textwrap.wrap(script, width=40))
-            # 폰트는 시스템에 설치된 나눔고딕 등 기본 한글 폰트를 불러옵니다.
             txt_clip = TextClip(wrapped_text, fontsize=45, color='white', font='NanumGothicBold', bg_color='rgba(0,0,0,0.6)')
-            # 화면 중앙 하단에 배치
             txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(duration).margin(bottom=70, opacity=0)
-            
-            # 이미지와 자막 결합
             video_clip = CompositeVideoClip([img_clip, txt_clip])
         except Exception as e:
-            # 깃허브 액션 환경에 폰트(ImageMagick)가 제대로 없으면 자막 없이 영상만 렌더링
             video_clip = img_clip
 
-        # 최종 오디오 입히기
         if os.path.exists(audio_path):
             try:
                 final_audio = AudioFileClip(audio_path)
@@ -237,7 +227,7 @@ def create_radio_broadcast_video():
 
     print("\n--- 모든 클립 병합 및 최종 렌더링 진행 ---")
     if clips:
-        # padding=-0.3을 주어 각 클립이 0.3초씩 겹치면서(크로스페이드) 넘어가도록 합니다
+        # padding=-0.3 초를 주어 대사와 화면이 자연스럽게 이어지도록 처리
         final_video = concatenate_videoclips(clips, method="compose", padding=-0.3)
         final_video.write_videofile(
             output_video_filename, 
@@ -250,7 +240,7 @@ def create_radio_broadcast_video():
             temp_audiofile="temp-audio.m4a", 
             remove_temp=True
         )
-        print(f"✅ 화자 분리 + 자막 + 장면전환 적용 완료! 파일명: {output_video_filename}")
+        print(f"✅ 에러 해결 완벽 렌더링! 파일명: {output_video_filename}")
 
 if __name__ == "__main__":
     create_radio_broadcast_video()
