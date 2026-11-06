@@ -24,9 +24,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests Pillow moviepy==1.0.3
     
-    - name: 한글 폰트 및 자막 프로그램 설치
+    - name: 한글 폰트 설치 및 자막(ImageMagick) 보안 권한 해제
       run: |
+        sudo apt-get update
         sudo apt-get install -y imagemagick fonts-nanum
+        sudo sed -i 's/domain="path" rights="none" pattern="@\*"/domain="path" rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml
 
     - name: 라디오 영상 제작 스크립트 실행
       env:
