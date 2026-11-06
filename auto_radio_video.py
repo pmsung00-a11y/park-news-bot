@@ -6,23 +6,25 @@ import numpy as np
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip, TextClip
 from moviepy.video.fx.all import fadein
 
-# --- 작업 폴더 설정 ---
+# 🔴 토큰 방어 스위치 (테스트할 땐 True, 최종 실전엔 False로 변경하세요!)
+TEST_MODE = True  
+
 WORK_DIR = "radio_work"
 ASSET_DIR = "radio_images"
 os.makedirs(WORK_DIR, exist_ok=True)
 os.makedirs(ASSET_DIR, exist_ok=True)
 
-# --- 1. 인물별 보이스 ID 매핑 ---
+# --- 인물별 보이스 ID 매핑 (순이 목소리 새 ID 적용 완료) ---
 VOICE_MAPPING = {
     "소영": "lxYfHSkYm1EzQzGhdbfc",  
-    "중현": "86GErZIiGJsPO3g7QNxZ", 
-    "순이": "4p0HBzAAGyju0nYfNntV", 
-    "문수": "s07IwTCOrCDCaETjUVjx", 
-    "봉규": "wAGzRVkxKEs8La0lmdrE", 
-    "수호": "ZJCNdZEjYwkOElxugmW2"
+    "중현": "86GErZIiGJsPO3g7QNxZ",  
+    "순이": "RILOU7YmBhvwJGDGjNmP",  
+    "문수": "s07IwTCOrCDCaETjUVjx",  
+    "봉규": "wAGzRVkxKEs8La0lmdrE",  
+    "수호": "ZJCNdZEjYwkOElxugmW2"   
 }
 
-# --- 2. 대본 및 씬(배경 이미지) 매칭 데이터 (총 78컷) ---
+# --- 대본 및 씬 매칭 데이터 ---
 radio_scenes = [
     {"no": 1, "speaker": "소영", "img": "img_thumb.png", "script": "기막힌 보험사연 라디오. 300만원 합의의 치명적인 함정, 지금 시작합니다."},
     {"no": 2, "speaker": "중현", "img": "img_scene_1.png", "script": "여보, 방금 보험사에서 전화 왔어. 합의금 제안이 왔는데 300만원이래."},
@@ -61,7 +63,7 @@ radio_scenes = [
     {"no": 35, "speaker": "중현", "img": "img_scene_6.png", "script": "그냥 우리 건강보험으로 한번 가봐요. 많이 아파?"},
     {"no": 36, "speaker": "순이", "img": "img_scene_6.png", "script": "어. 어지럼증도 있고. 자다가 팔이 저려서 깨기도 하고."},
     {"no": 37, "speaker": "소영", "img": "img_scene_7.png", "script": "병원에서 MRI를 찍었습니다. 그리고 결과를 들었어요."},
-    {"no": 38, "speaker": "문수", "img": "img_scene_7.png", "script": "경추 사번, 오번 사이에 디스크가 심하게 눌려 있어요. 신경을 압박하고 있는 상태인데, 이게 교통사고 충격으로 악화된 거거든요. 수술을 고려하셔야 할 거 같아요."},
+    {"no": 38, "speaker": "문수", "img": "img_scene_7.png", "script": "경추 사번, 오번 사이에 디스크가 심하게 눌려 있어요. 신경을 압박하고 있는 상태인데, 이게 교통사고 충격으로 악화된 거거든요. 수술을 고려하셔야 할 것 같아요."},
     {"no": 39, "speaker": "순이", "img": "img_scene_7.png", "script": "수술이요?"},
     {"no": 40, "speaker": "문수", "img": "img_scene_7.png", "script": "네. 지금 상태 계속 두면 팔 감각이 더 나빠질 수 있어요."},
     {"no": 41, "speaker": "순이", "img": "img_scene_7.png", "script": "근데 저 6개월 전에 교통사고로 합의 끝냈거든요. 그것 때문인 거 맞죠?"},
@@ -105,26 +107,32 @@ radio_scenes = [
 ]
 
 def generate_elevenlabs_audio(text, output_path, speaker):
-    """ElevenLabs API 호출 (화자에 맞는 보이스 ID 사용)"""
+    if TEST_MODE:
+        print(f"   [테스트 모드 활성] 일레븐랩스 API 토큰 절약 완료 ({speaker} 더빙 스킵)")
+        return
+        
+    # 기존 캐시(생성된 오디오)가 있다면 API를 재호출하지 않아 토큰을 또 아낍니다.
+    if os.path.exists(output_path):
+        print(f"   [캐시 사용] 이미 생성된 {speaker} 오디오 재사용")
+        return
+
     api_key = os.environ.get('ELEVENLABS_API_KEY')
     voice_id = VOICE_MAPPING.get(speaker, os.environ.get('ELEVENLABS_VOICE_ID', 'lxYfHSkYm1EzQzGhdbfc'))
     
     if not api_key:
-        print(f"⚠️ 경고: ELEVENLABS_API_KEY 없음. ({speaker} 더빙 스킵)")
+        print(f"⚠️ 경고: ELEVENLABS_API_KEY 없음.")
         return
         
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": api_key
-    }
+    headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": api_key}
+    
+    # 🔴 감정 표현 극대화: stability를 0.3으로 낮춰 더욱 생생한 대화톤 연출
     data = {
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
+            "stability": 0.3,  
+            "similarity_boost": 0.85
         }
     }
     
@@ -133,15 +141,13 @@ def generate_elevenlabs_audio(text, output_path, speaker):
         if response.status_code == 200:
             with open(output_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
+                    if chunk: f.write(chunk)
         else:
-            print(f"[{response.status_code}] ElevenLabs API 호출 실패 ({speaker}): {response.text}")
+            print(f"[{response.status_code}] API 호출 실패 ({speaker}): {response.text}")
     except Exception as e:
-        print(f"ElevenLabs 요청 중 에러 발생 ({speaker}): {e}")
+        print(f"API 요청 중 에러 발생 ({speaker}): {e}")
 
 def zoom_in_effect(clip, zoom_ratio=1.03):
-    """카메라가 아주 서서히 다가가는 줌 인 무빙 효과 (Pillow 기반으로 안전하게 처리)"""
     def effect(get_frame, t):
         scale = 1.0 + (zoom_ratio - 1.0) * (t / clip.duration)
         img = Image.fromarray(get_frame(t))
@@ -161,24 +167,21 @@ def create_radio_broadcast_video():
     img_width, img_height = 1920, 1080
     clips = []
     
-    print("--- 라디오 방송 다중 화자 영상 생성 시작 ---")
+    print(f"--- 영상 생성 시작 (TEST_MODE: {TEST_MODE}) ---")
     prev_img = None
     
     for data in radio_scenes:
         scene_no = data["no"]
         speaker = data["speaker"]
         script = data["script"]
-        print(f"▶ [{scene_no:02d}/{len(radio_scenes)}] 화자: {speaker} | 대사: {script[:15]}...")
+        print(f"▶ [{scene_no:02d}/{len(radio_scenes)}] {speaker}: {script[:15]}...")
         
-        # 1. 원본 이미지 불러와서 Pillow로 안전하게 크롭/리사이즈 (Moviepy 오류 방지)
+        # 1. 이미지 크롭 및 리사이즈 (워터마크 제거)
         img_path = os.path.join(ASSET_DIR, data["img"])
         if os.path.exists(img_path):
             img = Image.open(img_path).convert("RGB")
-            # 1920x1080 비율 꽉 채우기
             img = ImageOps.fit(img, (img_width, img_height), Image.Resampling.LANCZOS)
-            # 워터마크 제거 (하단 30픽셀 잘라내기 -> 1920x1050)
             img = img.crop((0, 0, img_width, img_height - 30))
-            # 다시 1920x1080으로 원상 복구 (Moviepy의 ANTIALIAS 에러 원천 차단)
             img = img.resize((img_width, img_height), Image.Resampling.LANCZOS)
         else:
             img = Image.new("RGB", (img_width, img_height), color=(30, 30, 35))
@@ -187,11 +190,11 @@ def create_radio_broadcast_video():
         img.save(processed_img_path)
         img_clip = ImageClip(processed_img_path)
         
-        # 2. 오디오 생성 및 길이 설정
+        # 2. 오디오 생성 (테스트 모드일 땐 스킵됨)
         audio_path = os.path.join(WORK_DIR, f"audio_{scene_no}.mp3")
         generate_elevenlabs_audio(script, audio_path, speaker)
         
-        duration = 4.0 
+        duration = 4.0 # 오디오 없을 시 기본 노출 시간(테스트용)
         if os.path.exists(audio_path):
             try:
                 final_audio = AudioFileClip(audio_path)
@@ -201,19 +204,26 @@ def create_radio_broadcast_video():
         
         img_clip = img_clip.set_duration(duration)
         
-        # 3. 줌 인 효과 및 장면 전환(Fade in)
+        # 3. 카메라 무빙(줌인) 및 크로스페이드(디졸브) 효과
         img_clip = zoom_in_effect(img_clip, zoom_ratio=1.03) 
         if data["img"] != prev_img and len(clips) > 0:
-            img_clip = fadein(img_clip, 0.6) # 이미지가 바뀔 때만 부드럽게 나타남
+            img_clip = fadein(img_clip, 0.6)
         prev_img = data["img"]
         
-        # 4. 하단 자막(말풍선) 추가
+        # 4. 하단 자막(말풍선) 추가 (폰트 오류 해결)
         try:
             wrapped_text = "\n".join(textwrap.wrap(script, width=40))
-            txt_clip = TextClip(wrapped_text, fontsize=45, color='white', font='NanumGothicBold', bg_color='rgba(0,0,0,0.6)')
+            txt_clip = TextClip(
+                wrapped_text, 
+                fontsize=45, 
+                color='white', 
+                font='NanumGothicBold', # 깃허브 가상환경에 설치한 나눔고딕
+                bg_color='rgba(0,0,0,0.6)'
+            )
             txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(duration).margin(bottom=70, opacity=0)
             video_clip = CompositeVideoClip([img_clip, txt_clip])
         except Exception as e:
+            print(f"자막 렌더링 실패 ({scene_no}컷): {e}")
             video_clip = img_clip
 
         if os.path.exists(audio_path):
@@ -227,7 +237,7 @@ def create_radio_broadcast_video():
 
     print("\n--- 모든 클립 병합 및 최종 렌더링 진행 ---")
     if clips:
-        # padding=-0.3 초를 주어 대사와 화면이 자연스럽게 이어지도록 처리
+        # padding=-0.3: 대사와 대사 사이 공백을 줄이고 자연스럽게 이어지게 함
         final_video = concatenate_videoclips(clips, method="compose", padding=-0.3)
         final_video.write_videofile(
             output_video_filename, 
@@ -240,7 +250,7 @@ def create_radio_broadcast_video():
             temp_audiofile="temp-audio.m4a", 
             remove_temp=True
         )
-        print(f"✅ 에러 해결 완벽 렌더링! 파일명: {output_video_filename}")
+        print(f"✅ 렌더링 완료! 파일명: {output_video_filename}")
 
 if __name__ == "__main__":
     create_radio_broadcast_video()
