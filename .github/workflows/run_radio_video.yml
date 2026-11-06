@@ -22,7 +22,7 @@ jobs:
     - name: 파이썬 필수 패키지 설치
       run: |
         python -m pip install --upgrade pip
-        pip install requests Pillow moviepy
+        pip install requests Pillow moviepy==1.0.3
 
     - name: 라디오 영상 제작 스크립트 실행
       env:
