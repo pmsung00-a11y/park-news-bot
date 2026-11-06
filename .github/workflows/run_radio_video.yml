@@ -23,6 +23,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install requests Pillow moviepy==1.0.3
+    
+    - name: 한글 폰트 및 자막 프로그램 설치
+      run: |
+        sudo apt-get install -y imagemagick fonts-nanum
 
     - name: 라디오 영상 제작 스크립트 실행
       env:
