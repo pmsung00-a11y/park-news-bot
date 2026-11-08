@@ -1,12 +1,12 @@
-name: Daangn Market Watcher
+name: Daangn Monitor Independent Bot
 
 on:
   schedule:
-    - cron: '0 */1 * * *' # 매 1시간마다 실행
+    - cron: '0 */2 * * *' # 2시간마다 독립적으로 실행
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  run-daangn-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,8 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install requests beautifulsoup4 selenium webdriver-manager
 
-      - name: Run script
-        run: python daangn_bot.py
+      - name: Run Daangn Monitor script
+        run: python daangn_monitor.py
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
