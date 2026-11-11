@@ -3,7 +3,7 @@ name: Morning News Automation
 on:
   schedule:
     # 매일 UTC 20:00 (한국 시간 오전 05:00)에 실행
-    - cron: '0 20 * * *'
+    - cron: '0 15 * * *'
   workflow_dispatch: # 수동 실행 버튼
 
 jobs:
