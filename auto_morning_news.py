@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (구글 드라이브 업로드 & 블로그 포스팅 지원 버전)
+# 박씨네 보험톡 - 최종 마스터 (구글 드라이브 업로드 & 랜덤 명언 & 블로그 자동화)
 # ==============================================================================
 
 import os
@@ -12,6 +12,7 @@ import subprocess
 import requests
 import difflib
 import time
+import random  # 매일 새로운 명언을 뽑기 위한 부품 추가
 from email.utils import parsedate_to_datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -22,7 +23,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
-# === [추가된 드라이브 업로드용 부품] ===
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -192,12 +192,10 @@ def get_circular_avatar(img_path, size=(300, 300)):
 def crop_transparent(img):
     try:
         bbox = img.split()[-1].getbbox()
-        if bbox:
-            return img.crop(bbox)
+        if bbox: return img.crop(bbox)
     except: pass
     return img
 
-# --- 🎬 비디오 렌더링 ---
 def create_full_news_video_with_audio():
     korea_timezone_offset = datetime.timedelta(hours=9)
     today_dt = datetime.datetime.utcnow() + korea_timezone_offset
@@ -307,7 +305,6 @@ def create_full_news_video_with_audio():
             draw.text((img_width//2, 102), data['category'], fill=(255, 255, 255, 255), font=font_title, anchor="mm")
             
             char_height = 190
-            
             toktok_file = find_image("toktok")
             if toktok_file and os.path.exists(toktok_file):
                 try:
@@ -399,7 +396,7 @@ def create_full_news_video_with_audio():
         audio_path = os.path.join(WORK_DIR, f"audio_{slide_no}.mp3")
         
         try:
-            print(f"[{slide_no}번 슬라이드] 일레븐랩스(형님 목소리) 음성 생성 시도...")
+            print(f"[{slide_no}번 슬라이드] 일레븐랩스 음성 생성 시도...")
             generate_elevenlabs_audio(data["script"], audio_path)
             final_audio = AudioFileClip(audio_path)
         except Exception as e:
@@ -420,7 +417,6 @@ def create_full_news_video_with_audio():
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="5000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
     
-    # === [블로그 포스팅용 텍스트 추출 기능 추가] ===
     blog_text = ""
     for idx, cat in enumerate(news_database, start=1):
         blog_text += f"\n▶ {idx}. {cat['category']}\n"
@@ -430,8 +426,6 @@ def create_full_news_video_with_audio():
     
     return filename, today_str, blog_text
 
-
-# === [유튜브 대신 구글 드라이브 업로드 함수로 완전 교체] ===
 def upload_to_drive(video_path, file_name):
     client_id = os.environ.get('YOUTUBE_CLIENT_ID')
     client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET')
@@ -453,17 +447,12 @@ def upload_to_drive(video_path, file_name):
         file_id = file.get('id')
         drive_link = file.get('webViewLink')
         
-        # 스마트폰/메일에서 링크 클릭 시 누구나 다운로드 가능하도록 권한 변경
         drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
-        
-        print(f"[구글 드라이브] 업로드 완료! 다운로드 링크: {drive_link}")
         return drive_link
     except Exception as e:
         print(f"[구글 드라이브] 업로드 에러 발생: {e}")
         return "구글 드라이브 업로드 지연 (에러 발생)"
 
-
-# === [블로그 복사-붙여넣기 폼으로 이메일 발송 함수 교체] ===
 def send_email_with_video(video_path, receiver_email, today_str, drive_link, blog_text):
     sender_email = "pmsung00@gmail.com"
     sender_password = os.environ.get('GMAIL_APP_PASSWORD')
@@ -474,7 +463,61 @@ def send_email_with_video(video_path, receiver_email, today_str, drive_link, blo
     msg['From'], msg['To'] = sender_email, receiver_email
     msg['Subject'] = f"[블로그용] {today_str} 박씨네 보험톡 아침뉴스 완성본"
     
-    # 블로그 포스팅용 맞춤형 이메일 본문
+    # 🌟 박씨네 보험톡 맞춤형 에이스 명언 50개 리스트
+    quotes = [
+        "건강은 가장 큰 재산이며, 긍정적인 마음은 가장 강한 무기입니다.",
+        "성공은 매일 반복된 작은 노력들의 합입니다. - 로버트 콜리어",
+        "위대한 일은 갑자기 이루어지지 않습니다. 작은 일들이 모여 이루어집니다. - 빈센트 반 고흐",
+        "행복의 문 하나가 닫히면 다른 문이 열립니다. - 헬렌 켈러",
+        "오늘 하루를 어떻게 보내느냐가 당신의 미래를 결정합니다.",
+        "기회는 일어나는 것이 아니라 만들어내는 것입니다. - 크리스 그로서",
+        "성공으로 가는 길은 항상 공사 중입니다. - 릴리 톰린",
+        "어제보다 나은 오늘을 만드는 것은 바로 지금 이 순간의 다짐입니다.",
+        "도전하지 않는 사람에게는 실패도, 성공도 찾아오지 않습니다.",
+        "가장 빛나는 별은 아직 발견되지 않은 당신의 내면에 있습니다.",
+        "어려움 속에는 항상 새로운 기회가 숨어 있습니다. - 알베르트 아인슈타인",
+        "우리의 가장 큰 영광은 한 번도 실패하지 않는 것이 아니라, 넘어질 때마다 일어서는 데 있습니다. - 공자",
+        "오늘 나무 그늘에서 쉴 수 있는 이유는 누군가 오래전에 나무를 심었기 때문입니다. - 워런 버핏",
+        "아무리 작은 변화라도 꾸준히 지속하면 위대한 결과를 만듭니다.",
+        "당신이 할 수 있다고 믿든 할 수 없다고 믿든, 당신이 믿는 대로 될 것입니다. - 헨리 포드",
+        "건강한 신체에 건강한 정신이 깃든다. - 유베날리스",
+        "가장 좋은 투자는 나 자신과 내 가족의 미래를 지키는 것입니다.",
+        "행복은 성취의 기쁨과 창조적 노력이 주는 스릴 속에 있습니다. - 프랭클린 루스벨트",
+        "우리가 두려워해야 할 것은 실패가 아니라, 시도조차 하지 않는 것입니다.",
+        "마음만을 가지고 있어서는 안 됩니다. 반드시 실천하여야 합니다. - 이소룡",
+        "오늘의 준비가 내일의 평안을 만듭니다.",
+        "인생에서 가장 큰 위험은 아무런 위험도 감수하지 않는 것입니다. - 마크 주커버그",
+        "자신을 믿는 순간부터 어떻게 살아갈지 알게 됩니다. - 괴테",
+        "성공이란 열정을 잃지 않고 실패를 거듭할 수 있는 능력입니다. - 윈스턴 처칠",
+        "당신의 하루를 지배하십시오. 그렇지 않으면 하루가 당신을 지배할 것입니다. - 짐 론",
+        "비온 뒤에 땅이 굳어지듯, 우리의 삶도 시련을 통해 더 단단해집니다.",
+        "모든 성취의 시작점은 마음속의 갈망입니다. - 나폴레온 힐",
+        "어떤 일이든 시작이 가장 중요합니다. 오늘 당장 시작하세요!",
+        "긍정적인 생각은 부정적인 생각보다 모든 것을 훨씬 더 낫게 만듭니다. - 지그 지글러",
+        "미래는 현재 우리가 무엇을 하고 있는가에 달려 있습니다. - 마하트마 간디",
+        "웃음은 돈이 들지 않지만, 그 가치는 계산할 수 없을 만큼 큽니다.",
+        "인생은 자전거를 타는 것과 같습니다. 균형을 잡으려면 계속 움직여야 합니다. - 아인슈타인",
+        "지금의 작은 땀방울이 미래의 큰 미소를 만듭니다.",
+        "준비된 자에게 기회는 반드시 찾아옵니다.",
+        "마음이 즐거우면 몸도 건강해집니다. 오늘 하루도 크게 한번 웃어보세요!",
+        "우리는 우리가 매일 하는 행동 그 자체입니다. - 아리스토텔레스",
+        "행복은 목적지가 아니라, 여행하는 과정 그 자체입니다.",
+        "시간은 우리가 가진 가장 귀중한 자산입니다.",
+        "당신의 미소가 누군가에게는 하루를 살아갈 큰 힘이 됩니다.",
+        "위기는 또 다른 이름의 기회입니다.",
+        "행동이 항상 행복을 가져다주지는 않을지 몰라도, 행동 없이는 행복도 없습니다.",
+        "인생은 폭풍우가 지나가길 기다리는 것이 아니라 빗속에서 춤추는 법을 배우는 것입니다.",
+        "지금 당장 행동하지 않으면 미래도 바뀌지 않습니다.",
+        "내가 변하면 세상이 변합니다. 긍정의 힘을 믿으세요!",
+        "시작하는 데 있어 너무 늦은 때란 없습니다.",
+        "건강을 잃으면 모든 것을 잃는 것입니다. 오늘 하루도 무조건 건강 챙기십시오!",
+        "우리가 꿈꿀 수 있다면, 우리는 그것을 이룰 수도 있습니다. - 월트 디즈니",
+        "인생의 가장 큰 실수는 실수할까 봐 두려워하는 것입니다.",
+        "자신의 길을 믿고 끝까지 걸어가십시오. 당신의 선택이 옳습니다.",
+        "오늘 당신이 베푼 작은 친절이 내일 더 큰 행운으로 돌아옵니다."
+    ]
+    daily_quote = random.choice(quotes)
+    
     email_body = f"""형님! 오늘의 뉴스 영상 제작 및 구글 드라이브 업로드가 완료되었습니다.
 
 🎥 [영상 다운로드 링크]
@@ -487,23 +530,20 @@ def send_email_with_video(video_path, receiver_email, today_str, drive_link, blo
 
 [제목] {today_str} 알면 돈이 되는 아침 뉴스 브리핑 (박씨네 보험톡)
 
-안녕하세요! 박씨네 보험톡입니다.
-오늘 하루도 힘차게 시작하실 수 있도록, 꼭 알아야 할 핵심 뉴스 5가지를 정리해 드립니다.
+💡 오늘의 명언
+"{daily_quote}"
+
+활기찬 아침입니다! 고객님의 든든한 파트너 박씨네 보험톡입니다.
+오늘 하루도 기분 좋게 시작하실 수 있도록, 꼭 알아야 할 핵심 뉴스를 준비했습니다.
+
+▶️ 오늘의 뉴스 영상 보러 가기 : [여기에 발행된 블로그 URL 붙여넣기]
 {blog_text}
-오늘도 안전하고 행복한 하루 보내시길 바랍니다! 
-보험에 관한 궁금증이나 리모델링 문의는 언제든 편하게 연락 주세요.
-
-📞 상담문의: 010-2062-4600
-💬 카카오톡: PMSUNGOO
-🌐 블로그: blog.naver.com/insureeasy
-
 #박씨네보험톡 #오늘의뉴스 #경제뉴스 #부동산뉴스 #건강보험 #보험리모델링 #생활꿀팁 #대구보험설계사 #실손보험청구
 =========================================
 """
     msg.attach(MIMEText(email_body, 'plain'))
     
     try:
-        # 이메일에 파일도 같이 첨부해서 보냄 (혹시 드라이브 링크가 터졌을 때를 대비한 예비용)
         with open(video_path, "rb") as attachment:
             part = MIMEBase('video', 'mp4')
             part.set_payload(attachment.read())
@@ -517,14 +557,7 @@ def send_email_with_video(video_path, receiver_email, today_str, drive_link, blo
         server.quit()
     except: pass
 
-
-# === [메인 실행 흐름 변경] ===
 if __name__ == "__main__":
-    # 1. 영상 제작 및 블로그용 텍스트 추출
     video_file, date_str, news_blog_text = create_full_news_video_with_audio()
-    
-    # 2. 구글 드라이브에 영상 올리고 링크 받아오기 (유튜브 업로드 삭제됨)
     gdrive_link = upload_to_drive(video_file, video_file)
-    
-    # 3. 블로그 포스팅용 양식으로 메일 발송
     send_email_with_video(video_file, "pmsung00@gmail.com", date_str, gdrive_link, news_blog_text)
