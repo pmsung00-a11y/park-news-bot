@@ -67,8 +67,6 @@ if __name__ == "__main__":
         national_news = get_google_news(national_keyword, max_articles=shortage)
         news_data.extend(national_news)
     
-    today = datetime.datetime.now().strftime("%Y%m%d")
-    # 파일 이름도 포괄적으로 변경합니다.
-    file_name = f"주간부동산뉴스_{today}.txt"
+    file_name = "주간부동산뉴스.txt"
     
     save_to_txt(news_data, filename=file_name)
