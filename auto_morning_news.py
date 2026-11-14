@@ -1,5 +1,5 @@
 # ==============================================================================
-# 박씨네 보험톡 - 최종 마스터 (디자인 완벽 고정 + 꿀팁 상식뉴스 키워드 최적화)
+# 박씨네 보험톡 - 최종 마스터 (구글 드라이브 업로드 & 블로그 포스팅 지원 버전)
 # ==============================================================================
 
 import os
@@ -21,6 +21,8 @@ from email import encoders
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from gtts import gTTS
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+
+# === [추가된 드라이브 업로드용 부품] ===
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -226,8 +228,6 @@ def create_full_news_video_with_audio():
     econ_news = fetch_category_news(["서울 아파트값", "전세 대출", "한국은행 금리", "부동산 PF"])
     finance_news = fetch_category_news(["코스피 마감", "미국 증시", "원달러 환율", "금융 당국"])
     social_news = fetch_category_news(["사건 사고", "사회 이슈", "교육 정책", "지역 뉴스"]) 
-    
-    # [수정] 꿀팁 상식뉴스: 겹침 방지를 위해 오직 실생활 꿀팁, 노하우, 상식 위주의 키워드로 완전히 교체!
     tip_news = fetch_category_news(["생활 꿀팁", "살림 노하우", "생활 정보", "유용한 상식", "생활비 절약"])
 
     def make_short_script(intro, news_list):
@@ -419,36 +419,52 @@ def create_full_news_video_with_audio():
 
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(filename, fps=24, preset="medium", threads=4, codec="libx264", bitrate="5000k", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, logger=None)
-    return filename, today_str
+    
+    # === [블로그 포스팅용 텍스트 추출 기능 추가] ===
+    blog_text = ""
+    for idx, cat in enumerate(news_database, start=1):
+        blog_text += f"\n▶ {idx}. {cat['category']}\n"
+        for item in cat['items'][:6]:
+            title = item.split('|')[0]
+            blog_text += f" - {title}\n"
+    
+    return filename, today_str, blog_text
 
-def upload_to_youtube(video_path, today_str):
+
+# === [유튜브 대신 구글 드라이브 업로드 함수로 완전 교체] ===
+def upload_to_drive(video_path, file_name):
     client_id = os.environ.get('YOUTUBE_CLIENT_ID')
     client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET')
     refresh_token = os.environ.get('YOUTUBE_REFRESH_TOKEN')
     
     if not all([client_id, client_secret, refresh_token]): 
-        return None
+        return "토큰 에러: 깃허브 설정(Secrets)을 확인하세요."
 
     creds = Credentials(None, refresh_token=refresh_token, token_uri="https://oauth2.googleapis.com/token", client_id=client_id, client_secret=client_secret)
-    youtube = build("youtube", "v3", credentials=creds)
     
-    body = {
-        "snippet": {
-            "title": f"[{today_str}] 박씨네 보험톡 일일 주요뉴스 브리핑 (경제/건강/생활)",
-            "description": f"안녕하십니까! 박씨네 보험톡입니다.\n오늘({today_str})의 핵심 뉴스를 브리핑해 드립니다.\n\n📞 010-2062-4600\n💬 카카오톡: PMSUNGOO\n🌐 블로그: blog.naver.com/insureeasy",
-            "tags": ["박씨네보험톡", "보험뉴스", "경제뉴스", "건강보험", "오늘의뉴스"],
-            "categoryId": "25"
-        },
-        "status": {"privacyStatus": "private"}
-    }
     try:
-        media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
-        response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
-        return f"https://youtu.be/{response['id']}"
-    except: 
-        return None
+        print("\n[구글 드라이브] 영상 자동 업로드를 시작합니다...")
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        file_metadata = {'name': file_name}
+        media = MediaFileUpload(video_path, mimetype='video/mp4', resumable=True)
+        
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+        file_id = file.get('id')
+        drive_link = file.get('webViewLink')
+        
+        # 스마트폰/메일에서 링크 클릭 시 누구나 다운로드 가능하도록 권한 변경
+        drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+        
+        print(f"[구글 드라이브] 업로드 완료! 다운로드 링크: {drive_link}")
+        return drive_link
+    except Exception as e:
+        print(f"[구글 드라이브] 업로드 에러 발생: {e}")
+        return "구글 드라이브 업로드 지연 (에러 발생)"
 
-def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
+
+# === [블로그 복사-붙여넣기 폼으로 이메일 발송 함수 교체] ===
+def send_email_with_video(video_path, receiver_email, today_str, drive_link, blog_text):
     sender_email = "pmsung00@gmail.com"
     sender_password = os.environ.get('GMAIL_APP_PASSWORD')
     
@@ -456,25 +472,38 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
     
     msg = MIMEMultipart()
     msg['From'], msg['To'] = sender_email, receiver_email
-    msg['Subject'] = f"[박씨네 보험톡] {today_str} 주요뉴스 및 카톡 전송용 링크"
+    msg['Subject'] = f"[블로그용] {today_str} 박씨네 보험톡 아침뉴스 완성본"
     
-    email_body = f"""형님! 오늘의 뉴스 영상이 완성되었습니다.
-아래 링크를 복사해서 카카오톡으로 고객님들께 전송해 주십시오!
+    # 블로그 포스팅용 맞춤형 이메일 본문
+    email_body = f"""형님! 오늘의 뉴스 영상 제작 및 구글 드라이브 업로드가 완료되었습니다.
 
-↓↓↓↓↓ [여기서부터 복사] ↓↓↓↓↓
+🎥 [영상 다운로드 링크]
+{drive_link}
+(위 링크를 눌러 우측 상단 '다운로드' 버튼으로 영상을 받으신 후 블로그에 올려주세요.)
 
-활기찬 아침입니다! 고객님의 든든한 파트너 박씨네 보험톡입니다.
-오늘({today_str}) 놓치지 말아야 할 2분 핵심 뉴스를 준비했습니다.
+=========================================
+👇 [아래 텍스트를 복사해서 블로그에 바로 올리세요] 👇
+=========================================
 
-▶️ 오늘의 영상 보기 : {youtube_link if youtube_link else '유튜브 업로드 지연'}
+[제목] {today_str} 알면 돈이 되는 아침 뉴스 브리핑 (박씨네 보험톡)
 
-바쁜 출근길, 유익한 정보 챙겨가시고 오늘 하루도 기분 좋은 일만 가득하시길 진심으로 응원합니다. 늘 감사합니다!
+안녕하세요! 박씨네 보험톡입니다.
+오늘 하루도 힘차게 시작하실 수 있도록, 꼭 알아야 할 핵심 뉴스 5가지를 정리해 드립니다.
+{blog_text}
+오늘도 안전하고 행복한 하루 보내시길 바랍니다! 
+보험에 관한 궁금증이나 리모델링 문의는 언제든 편하게 연락 주세요.
 
-↑↑↑↑↑ [여기까지 복사] ↑↑↑↑↑
+📞 상담문의: 010-2062-4600
+💬 카카오톡: PMSUNGOO
+🌐 블로그: blog.naver.com/insureeasy
+
+#박씨네보험톡 #오늘의뉴스 #경제뉴스 #부동산뉴스 #건강보험 #보험리모델링 #생활꿀팁 #대구보험설계사 #실손보험청구
+=========================================
 """
     msg.attach(MIMEText(email_body, 'plain'))
     
     try:
+        # 이메일에 파일도 같이 첨부해서 보냄 (혹시 드라이브 링크가 터졌을 때를 대비한 예비용)
         with open(video_path, "rb") as attachment:
             part = MIMEBase('video', 'mp4')
             part.set_payload(attachment.read())
@@ -488,7 +517,14 @@ def send_email_with_video(video_path, receiver_email, today_str, youtube_link):
         server.quit()
     except: pass
 
+
+# === [메인 실행 흐름 변경] ===
 if __name__ == "__main__":
-    video_file, date_str = create_full_news_video_with_audio()
-    yt_link = upload_to_youtube(video_file, date_str)
-    send_email_with_video(video_file, "pmsung00@gmail.com", date_str, yt_link)
+    # 1. 영상 제작 및 블로그용 텍스트 추출
+    video_file, date_str, news_blog_text = create_full_news_video_with_audio()
+    
+    # 2. 구글 드라이브에 영상 올리고 링크 받아오기 (유튜브 업로드 삭제됨)
+    gdrive_link = upload_to_drive(video_file, video_file)
+    
+    # 3. 블로그 포스팅용 양식으로 메일 발송
+    send_email_with_video(video_file, "pmsung00@gmail.com", date_str, gdrive_link, news_blog_text)
