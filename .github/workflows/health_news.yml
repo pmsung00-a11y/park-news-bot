@@ -2,8 +2,9 @@ name: Weekly Health News Collector
 
 on:
   schedule:
-    - cron: '0 20 * * 4' # 매주 목요일 밤 20:00 UTC (금요일 아침 5:00 KST)
-  workflow_dispatch:
+    # 한국 시간 기준 매주 금요일 오전 9시 (UTC 0시)
+    - cron: '0 0 * * 5'
+  workflow_dispatch: # 우리가 지금 당장 수동으로 테스트해 볼 수 있게 해주는 버튼
 
 jobs:
   build:
